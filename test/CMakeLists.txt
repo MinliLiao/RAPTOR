@@ -11,7 +11,11 @@ set(RAPTOR_TEST_DEPS LLVMRaptor-${LLVM_VERSION_MAJOR} Raptor-RT-${LLVM_VERSION_M
 
 add_subdirectory(Unit)
 if (${Clang_FOUND})
-  add_subdirectory(Integration)
+  if (MPFR_LIB_PATH)
+    add_subdirectory(Integration)
+  else ()
+    message(WARNING "mpfr lib required for integration test but not found. Skipping integration test.")
+  endif()
 endif()
 
 umbrella_lit_testsuite_end(check-all)

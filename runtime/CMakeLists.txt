@@ -39,6 +39,11 @@ set(RAPTOR_PUBLIC_INCLUDE_DIR
 )
 
 target_include_directories(Raptor-RT-${LLVM_VERSION_MAJOR} PRIVATE ${RAPTOR_PRIVATE_INCLUDE_DIR})
+if(HAS_MPFR_H)
+  target_include_directories(Raptor-RT-${LLVM_VERSION_MAJOR} PRIVATE ${MPFR_HEADER_DIR})
+else()
+  message(SEND_ERROR "MPFR header required by Raptor-RT-${LLVM_VERSION_MAJOR} but not found.")
+endif()
 target_include_directories(Raptor-RT-${LLVM_VERSION_MAJOR} PUBLIC
   $<BUILD_INTERFACE:${RAPTOR_PUBLIC_INCLUDE_DIR}>
   $<INSTALL_INTERFACE:include>

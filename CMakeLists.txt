@@ -264,9 +264,16 @@ set(INSTALL_CMAKE_DIR ${DEF_INSTALL_CMAKE_DIR} CACHE PATH
 
 
 find_library(MPFR_LIB_PATH mpfr)
+find_path(MPFR_HEADER_DIR "mpfr.h")
+cmake_push_check_state()
+list(APPEND CMAKE_REQUIRED_INCLUDES ${MPFR_HEADER_DIR})
 CHECK_INCLUDE_FILE("mpfr.h" HAS_MPFR_H)
+cmake_pop_check_state()
 message("MPFR lib: " ${MPFR_LIB_PATH})
 message("MPFR header: " ${HAS_MPFR_H})
+if (HAS_MPFR_H)
+  message("MPFR header dir: " ${MPFR_HEADER_DIR})
+endif()
 
 include_directories("${CMAKE_CURRENT_BINARY_DIR}/include")
 

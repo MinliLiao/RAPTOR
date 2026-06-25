@@ -196,6 +196,10 @@ public:
 
   Type *getToType() { return toType; }
 
+  bool isVecOfFromType(llvm::Type * Ty) {
+    return Ty->isVectorTy() && (Ty->getScalarType() == getFromType());
+  }
+
   CallInst *createFPRTConstCall(llvm::IRBuilderBase &B, Value *V) {
     assert(V->getType() == getFromType());
     SmallVector<Value *, 1> Args;
@@ -519,6 +523,10 @@ public:
   void visitUnaryOperator(UnaryOperator &I) {
     switch (I.getOpcode()) {
     case UnaryOperator::FNeg: {
+      if (isVecOfFromType(I.getOperand(0)->getType())) {
+        EmitWarning("FPNoFollow", I, 
+                    "Will not follow FP through this vector operand.", I);
+      }
       if (I.getOperand(0)->getType() != getFromType())
         return;
       if (!TC.isToFPRT())
@@ -547,6 +555,10 @@ public:
     case TruncMemMode: {
       auto LHS = getNewFromOriginal(CI.getOperand(0));
       auto RHS = getNewFromOriginal(CI.getOperand(1));
+      if (isVecOfFromType(LHS->getType())) {
+        EmitWarning("FPNoFollow", CI, 
+                    "Will not follow FP through this vector operand.", CI);
+      }
       if (LHS->getType() != getFromType())
         return;
 
@@ -593,6 +605,13 @@ public:
     case TruncMemMode: {
       auto newI = getNewFromOriginal(&CI);
       auto newSrc = newI->getOperand(0);
+      if (isVecOfFromType(CI.getSrcTy())) {
+        EmitWarning("FPNoFollow", CI, 
+                    "Will not follow FP through this vector operand.", CI);
+      } else if (isVecOfFromType(CI.getDestTy())) {
+        EmitWarning("FPNoFollow", CI, 
+                    "Will not follow FP through this vector operand.", CI);
+      }
       if (CI.getSrcTy() == getFromType()) {
         IRBuilder<> B(newI);
         if (isa<Constant>(newSrc))
@@ -621,6 +640,10 @@ public:
   void visitSelectInst(llvm::SelectInst &SI) {
     switch (Mode) {
     case TruncMemMode: {
+      if (isVecOfFromType(SI.getType())) {
+        EmitWarning("FPNoFollow", SI, 
+                    "Will not follow FP through this vector operand.", SI);
+      }
       if (SI.getType() != getFromType())
         return;
       auto newI = getNewFromOriginal(&SI);
@@ -650,6 +673,14 @@ public:
     auto oldLHS = BO.getOperand(0);
     auto oldRHS = BO.getOperand(1);
 
+    if (isVecOfFromType(oldLHS->getType())) {
+      EmitWarning("FPNoFollow", BO, 
+                  "Will not follow FP through this LHS vector operand.", BO);
+    }
+    if (isVecOfFromType(oldRHS->getType())) {
+      EmitWarning("FPNoFollow", BO, 
+                  "Will not follow FP through this RHS vector operand.", BO);
+    }
     if (oldLHS->getType() != getFromType() &&
         oldRHS->getType() != getFromType())
       return;
@@ -724,6 +755,10 @@ public:
     bool hasFromType = false;
     SmallVector<Value *, 2> new_ops(CI.arg_size());
     for (unsigned i = 0; i < CI.arg_size(); ++i) {
+      if (isVecOfFromType(orig_ops[i]->getType())) {
+        EmitWarning("FPNoFollow", CI, 
+                    "Will not follow FP through this vector arg.", CI);
+      }
       if (orig_ops[i]->getType() == getFromType()) {
         new_ops[i] = truncate(B, getNewFromOriginal(orig_ops[i]));
         hasFromType = true;
@@ -732,6 +767,10 @@ public:
       }
     }
     Type *retTy = CI.getType();
+    if (isVecOfFromType(CI.getType())) {
+      EmitWarning("FPNoFollow", CI, 
+                  "Will not follow FP through this vector ret type.", CI);
+    }
     if (CI.getType() == getFromType()) {
       hasFromType = true;
       retTy = getToType();
@@ -766,6 +805,10 @@ public:
     case TruncMemMode: {
       if (I.getNumOperands() == 0)
         return;
+      if (isVecOfFromType(I.getReturnValue()->getType())) {
+        EmitWarning("FPNoFollow", I, 
+                    "Will not follow FP through this vector return value.", I);
+      }
       if (I.getReturnValue()->getType() != getFromType())
         return;
       auto newI = cast<llvm::ReturnInst>(getNewFromOriginal(&I));
@@ -797,6 +840,10 @@ public:
                         llvm::SyncScope::ID syncScope, llvm::Value *mask) {
     switch (Mode) {
     case TruncMemMode: {
+      if (isVecOfFromType(orig_val->getType())) {
+        EmitWarning("FPNoFollow", I, 
+                    "Will not follow FP through this vector store value.", I);
+      }
       if (orig_val->getType() != getFromType())
         return;
       if (!isa<ConstantFP>(orig_val))
@@ -979,6 +1026,10 @@ public:
   void visitPHINode(llvm::PHINode &PN) {
     switch (Mode) {
     case TruncMemMode: {
+      if (isVecOfFromType(PN.getType())) {
+        EmitWarning("FPNoFollow", PN, 
+                    "Will not follow FP through this vector PHI node.", PN);
+      }
       if (PN.getType() != getFromType())
         return;
       auto NewPN = cast<llvm::PHINode>(getNewFromOriginal(&PN));

@@ -116,6 +116,10 @@ private:
     return std::string(RaptorPrefix) + RTName + "_" + TC.mangleFrom() + "_" +
            Name;
   }
+  std::string getVecFPRTName(std::string Name, bool isScalable, unsigned fixedLen) {
+    return std::string(RaptorPrefix) + RTName + "_vec" + (isScalable? "nx" : "") + 
+           Twine(fixedLen).str() + "x_" + TC.mangleFrom() + "_" + Name;
+  }
 
   // Creates a function which contains the original floating point operation.
   // The user can use this to compare results against.
@@ -143,6 +147,225 @@ private:
       // Clear invalidated debug metadata now that we defined the function
       F->clearMetadata();
     }
+  }
+
+  // Get the element count of vector operand/argument of vector op/func to for
+  // conversion to FPRT
+  ElementCount getVecFPRTFuncEC(Instruction &I, SmallVectorImpl<Value *> &Args,
+                              llvm::VectorType *RetTy) {
+    ElementCount EC = RetTy->getElementCount();
+    bool hasVecFromType = false;
+    bool allVecSizeMatch = true;
+    if (!Args.empty() && isVecOfFromType(Args[0]->getType())) {
+      hasVecFromType = true;
+      allVecSizeMatch = 
+        (EC == cast<VectorType>(Args[0]->getType())->getElementCount());
+    }
+    if (dyn_cast<UnaryOperator>(&I)) {
+      if (!hasVecFromType)
+        llvm_unreachable("Unexpected unary op for vec conversion to FPRT");
+      assert(RetTy == Args[0]->getType());
+    } else if (dyn_cast<BinaryOperator>(&I)) {
+      if (!hasVecFromType)
+        llvm_unreachable("Unexpected binary op for vec conversion to FPRT");
+      assert(Args[0]->getType() == Args[1]->getType());
+    } else if (dyn_cast<FCmpInst>(&I)) {
+      if (!hasVecFromType)
+        llvm_unreachable("Unexpected fcmp inst for vec conversion to FPRT");
+      assert(Args[0]->getType() == Args[1]->getType());
+    } else if (dyn_cast<CallInst>(&I)) { // Include IntrinsicInst
+      for (auto it = Args.begin(); it != Args.end(); ++it) {
+        if ((*it)->getType()->isVectorTy()) {
+          allVecSizeMatch = allVecSizeMatch && 
+            (EC == cast<VectorType>((*it)->getType())->getElementCount());
+          hasVecFromType = hasVecFromType || 
+            isVecOfFromType((*it)->getType());
+        }
+      }
+    }
+    if (!hasVecFromType)
+      llvm_unreachable(
+        "Unexpected inst without vec fromTy param for vec conversion to FPRT");
+    if (!allVecSizeMatch)
+      llvm_unreachable(
+        "Unexpected inst with different vec sizes for vec conversion to FPRT");
+    assert(hasVecFromType && allVecSizeMatch);
+    return EC;
+  }
+
+  // Get scalar intrinsic func name
+  std::string getScalarIntrinsicFuncName(IntrinsicInst &II) {
+    llvm::Intrinsic::ID ID = II.getIntrinsicID();
+    assert(ID != Intrinsic::not_intrinsic);
+    // Get the overload types in vecTypes
+    SmallVector<Type *, 4> vecTypes;
+    SmallVector<Intrinsic::IITDescriptor, 8> Table;
+    getIntrinsicInfoTableEntries(ID, Table);
+    ArrayRef<Intrinsic::IITDescriptor> TableRef = Table;
+    Intrinsic::matchIntrinsicSignature(II.getCalledFunction()->getFunctionType(), TableRef, vecTypes);
+    SmallVector<Type *, 4> scalarTypes;
+    for (auto ty : vecTypes) {
+      if (auto vecType = dyn_cast<VectorType>(ty)) {
+        scalarTypes.push_back(vecType->getScalarType());
+      } else {
+        scalarTypes.push_back(ty);
+      }
+    }
+    std::string Name = Intrinsic::getName(ID, scalarTypes, II.getModule());
+    Name = "intr_" + Name;
+    for (auto &C : Name)
+      if (C == '.')
+        C = '_';
+    return Name;
+  }
+
+  Value *InsertScalarFPRTCall(llvm::IRBuilderBase &B, std::string Name, 
+                              Value * startingIndex, Value * vecRet,
+                              Function * F, SmallVectorImpl<Value *> &Args,
+                              llvm::VectorType *RetTy, Value *LocStr) {
+    llvm::Type * scalarRetTy = RetTy->getScalarType();
+    auto fixedVecLen = RetTy->getElementCount().getKnownMinValue();
+    // Each insertElement creates a new value
+    SmallVector<Value *, 4> vecRets;
+    vecRets.push_back(vecRet);
+    for (auto i = 0; i < fixedVecLen; ++i) {
+      // vecId = startingIndex + i;
+      Value * vecId = (startingIndex == nullptr)? B.getInt64(i) :
+                      (i == 0) ? startingIndex :
+                      B.CreateAdd(startingIndex, B.getInt64(i));
+      // Construct input arguments to the scalar FPRT call
+      SmallVector<Value *, 4> scalarArgs;
+      for (auto j = 0; j < Args.size(); ++j) {
+        if (Args[j]->getType()->isVectorTy()) { 
+          // scalarArg = Args[k][vecId]; 
+          Value * scalarArg = B.CreateExtractElement(F->getArg(j), vecId);
+          // scalarArgs[k] = scalarArg;
+          scalarArgs.push_back(scalarArg);
+        } else {
+          // scalarArgs[k] = Args[k];
+          scalarArgs.push_back(F->getArg(j));
+        }
+      }
+      // scalarRet = scalarFPRTCall(scalarArgs);
+      CallInst *scalarRet = createFPRTGeneric(B, Name, scalarArgs, scalarRetTy,
+                                              LocStr);
+      // Forward extra args from vec to scalar call
+      for (auto k = Args.size(); k < scalarRet->arg_size(); ++k) {
+        scalarRet->setArgOperand(k, F->getArg(k));
+      }
+      // vecRet[vecId] = scalarRet;
+      vecRets.push_back(B.CreateInsertElement(vecRets[i], scalarRet, vecId));
+    }
+    return vecRets.back();
+  }
+
+  // Create a function which contains a loop over truncated scalar version of
+  // the original vectorized operations
+  Function *CreateVecFPRTFunc(llvm::IRBuilderBase &B, std::string vecName, 
+                              std::string scalarName,
+                              SmallVectorImpl<Value *> &Args,
+                              llvm::VectorType *RetTy, Value *LocStr) {
+    auto isScalable = RetTy->getElementCount().isScalable();
+    auto fixedVecLen = RetTy->getElementCount().getKnownMinValue();
+    auto MangledName = getVecFPRTName(vecName, isScalable, fixedVecLen);
+    auto F = M->getFunction(MangledName);
+    
+    if (!F) {
+      SmallVector<Type *, 4> ArgTypes;
+      for (auto Arg : Args)
+        ArgTypes.push_back(Arg->getType());
+      for (auto CustomArg : CustomArgs)
+        ArgTypes.push_back(CustomArg->getType());
+      ArgTypes.push_back(LocStr->getType());
+      ArgTypes.push_back(scratch->getType());
+      FunctionType *FnTy =
+          FunctionType::get(RetTy, ArgTypes, /*is_vararg*/ false);
+      F = Function::Create(FnTy, Function::WeakAnyLinkage, MangledName, M);
+      if (isScalable) {
+        EmitWarning("UntestedTruncation", *F, 
+                    "Raptor FPRT func with scalable vector operand has not ",
+                    "been tested.", *F);
+      }
+    }
+    if (F->isDeclaration()) {
+      BasicBlock *Entry = BasicBlock::Create(F->getContext(), "entry", F);
+      IRBuilder<> vecFuncB(Entry);
+      if (!isScalable) {
+        // vecRet[fixedVecLen];
+        Value *vecRet = PoisonValue::get(RetTy);
+        // Insert fixedVecLen instances of scalar FPRT call
+        vecRet = InsertScalarFPRTCall(vecFuncB, scalarName, nullptr, vecRet, F,
+                                      Args, RetTy, LocStr);
+        vecFuncB.CreateRet(vecRet);
+      } else {
+        BasicBlock *Body = BasicBlock::Create(F->getContext(), "loop.body", F);
+        BasicBlock *Exit = BasicBlock::Create(F->getContext(), "exit", F);
+        // vecLen = vscale * fixedVecLen
+        Value *vscale = vecFuncB.CreateIntrinsic(Intrinsic::vscale, 
+                                                 {vecFuncB.getInt64Ty()}, {});
+        Value *vecLen = vecFuncB.CreateMul(vscale, 
+                                           vecFuncB.getInt64(fixedVecLen));
+        vecFuncB.CreateBr(Body);
+        // for (
+        vecFuncB.SetInsertPoint(Body);
+        //      i = 0;;) {
+        PHINode * i = vecFuncB.CreatePHI(vecFuncB.getInt64Ty(), 2);
+        i->addIncoming(vecFuncB.getInt64(0), Entry);
+        //   vecRet[vecLen];
+        PHINode *vecPHI = vecFuncB.CreatePHI(RetTy, 2);
+        vecPHI->addIncoming(PoisonValue::get(RetTy), Entry);
+        //   Insert fixedVecLen instances of scalar FPRT call
+        Value * vecRet = InsertScalarFPRTCall(vecFuncB, scalarName, i, vecPHI,
+                                              F, Args, RetTy, LocStr);
+        vecPHI->addIncoming(vecRet, Body);
+        //   i += fixedVecLen;
+        Value * incI = vecFuncB.CreateAdd(i, vecFuncB.getInt64(fixedVecLen));
+        i->addIncoming(incI, Body);
+        //   if (i == vecLen) break;
+        Value * stopCond = vecFuncB.CreateCmp(CmpInst::Predicate::ICMP_EQ, i, 
+                                              vecLen);
+        vecFuncB.CreateCondBr(stopCond, Exit, Body);
+        // }
+        vecFuncB.SetInsertPoint(Exit);
+        // return vecRet;
+        vecFuncB.CreateRet(vecRet);
+      }
+      F->setLinkage(GlobalValue::WeakODRLinkage);
+      // Clear invalidated debug metadata now that we defined the function
+      F->clearMetadata();
+    }
+    return F;
+  }
+
+  // Create call to truncated vectorized operations (through loop of scalar)
+  CallInst *createVecFPRTFuncCall(llvm::IRBuilderBase &B, ElementCount &EC, 
+                                  std::string vecName, std::string scalarName,
+                                  SmallVectorImpl<Value *> &Args, 
+                                  llvm::VectorType *RetTy, Value *LocStr) {
+    auto MangledName = getVecFPRTName(vecName, EC.isScalable(), 
+                                      EC.getKnownMinValue());
+    auto F = M->getFunction(MangledName);
+    if (!F) {
+      F = CreateVecFPRTFunc(B, vecName, scalarName, Args, RetTy, LocStr);
+    }
+    SmallVector<Value *, 4> vecArgs;
+    for (auto Arg : Args) {
+      vecArgs.push_back(Arg);
+    }
+    vecArgs.append(CustomArgs);
+    vecArgs.push_back(LocStr);
+    vecArgs.push_back(scratch);
+    // Explicitly assign a dbg location if it didn't exist, as the FPRT
+    // functions are inlineable and the backend fails if the callsite does not
+    // have dbg metadata
+    // TODO consider using InstrumentationIRBuilder
+    Function *ContainingF = B.GetInsertBlock()->getParent();
+    if (!B.getCurrentDebugLocation() && ContainingF->getSubprogram())
+      B.SetCurrentDebugLocation(DILocation::get(ContainingF->getContext(), 0, 0,
+                                                ContainingF->getSubprogram()));
+    auto *CI = cast<CallInst>(B.CreateCall(F, vecArgs));
+
+    return CI;
   }
 
   Function *getFPRTFunc(std::string Name, SmallVectorImpl<Value *> &Args,

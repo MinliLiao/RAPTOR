@@ -924,9 +924,66 @@ public:
     }
     llvm_unreachable("");
   }
-  void visitExtractElementInst(llvm::ExtractElementInst &EEI) { return; }
-  void visitInsertElementInst(llvm::InsertElementInst &EEI) { return; }
-  void visitShuffleVectorInst(llvm::ShuffleVectorInst &EEI) { return; }
+  void visitExtractElementInst(llvm::ExtractElementInst &EEI) { 
+    switch (Mode) {
+    case TruncMemMode: {
+      if (EEI.getType()->getScalarType() != getFromType())
+        return;
+      auto newI = getNewFromOriginal(&EEI);
+      IRBuilder<> B(newI);
+      // VectorType that elements are being extracted from
+      if (isVecOfConst(newI->getOperand(0)))
+        newI->setOperand(0, createFPRTConstCall(B, newI->getOperand(0)));
+      return;
+    }
+    case TruncOpMode:
+    case TruncOpFullModuleMode:
+      return;
+    }
+    llvm_unreachable("");
+  }
+  void visitInsertElementInst(llvm::InsertElementInst &EEI) { 
+    switch (Mode) {
+    case TruncMemMode: {
+      if (EEI.getType()->getScalarType() != getFromType())
+        return;
+      auto newI = getNewFromOriginal(&EEI);
+      IRBuilder<> B(newI);
+      // VectorType that elements are being inserted to
+      if (isVecOfConst(newI->getOperand(0)))
+        newI->setOperand(0, createFPRTConstCall(B, newI->getOperand(0)));
+      // Inserted scalar value
+      if (isa<ConstantFP>(newI->getOperand(1)))
+        newI->setOperand(1, createFPRTConstCall(B, newI->getOperand(1)));
+      return;
+    }
+    case TruncOpMode:
+    case TruncOpFullModuleMode:
+      return;
+    }
+    llvm_unreachable("");
+  }
+  void visitShuffleVectorInst(llvm::ShuffleVectorInst &EEI) { 
+    switch (Mode) {
+    case TruncMemMode: {
+      if (EEI.getType()->getScalarType() != getFromType())
+        return;
+      auto newI = getNewFromOriginal(&EEI);
+      IRBuilder<> B(newI);
+      // First VectorType that is being shuffled
+      if (isVecOfConst(newI->getOperand(0)))
+        newI->setOperand(0, createFPRTConstCall(B, newI->getOperand(0)));
+      // Second VectorType that is being shuffled
+      if (isVecOfConst(newI->getOperand(1)))
+        newI->setOperand(1, createFPRTConstCall(B, newI->getOperand(1)));
+      return;
+    }
+    case TruncOpMode:
+    case TruncOpFullModuleMode:
+      return;
+    }
+    llvm_unreachable("");
+  }
   void visitExtractValueInst(llvm::ExtractValueInst &EEI) { return; }
   void visitInsertValueInst(llvm::InsertValueInst &EEI) { return; }
   void visitBinaryOperator(llvm::BinaryOperator &BO) {

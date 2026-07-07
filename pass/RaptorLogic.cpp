@@ -423,26 +423,64 @@ public:
     return Ty->isVectorTy() && (Ty->getScalarType() == getFromType());
   }
 
+  bool hasVecOfFromType(SmallVectorImpl<Value *> &ArgsIn) {
+    bool found = false;
+    for (auto Args : ArgsIn) {
+      found = found || isVecOfFromType(Args->getType());
+    }
+    return found;
+  }
+
+  VectorType *getVecToType(ElementCount EC) {
+    return VectorType::get(toType, EC);
+  }
+
+  bool isVecOfConst(Value * V) {
+    return V->getType()->isVectorTy() && dyn_cast<Constant>(V);
+  }
+
   CallInst *createFPRTConstCall(llvm::IRBuilderBase &B, Value *V) {
-    assert(V->getType() == getFromType());
+    assert(V->getType()->getScalarType() == getFromType());
     SmallVector<Value *, 1> Args;
     Args.push_back(V);
+    if (isVecOfFromType(V->getType())) {
+      assert(isVecOfConst(V));
+      ElementCount EC = cast<VectorType>(V->getType())->getElementCount();
+      return createVecFPRTFuncCall(B, EC, "const", "const", Args, 
+                                   getVecToType(EC), UnknownLoc);
+    }
     return createFPRTGeneric(B, "const", Args, getToType(), UnknownLoc);
   }
   CallInst *createFPRTNewCall(llvm::IRBuilderBase &B, Value *V) {
-    assert(V->getType() == getFromType());
+    assert(V->getType()->getScalarType() == getFromType());
     SmallVector<Value *, 1> Args;
     Args.push_back(V);
+    if (isVecOfFromType(V->getType())) {
+      ElementCount EC = cast<VectorType>(V->getType())->getElementCount();
+      return createVecFPRTFuncCall(B, EC, "new", "new", Args, getVecToType(EC),
+                                   UnknownLoc);
+    }
     return createFPRTGeneric(B, "new", Args, getToType(), UnknownLoc);
   }
   CallInst *createFPRTGetCall(llvm::IRBuilderBase &B, Value *V) {
     SmallVector<Value *, 1> Args;
     Args.push_back(V);
+    if (isVecOfFromType(V->getType())) {
+      ElementCount EC = cast<VectorType>(V->getType())->getElementCount();
+      return createVecFPRTFuncCall(B, EC, "get", "get", Args, getVecToType(EC),
+                                   UnknownLoc);
+    }
     return createFPRTGeneric(B, "get", Args, getToType(), UnknownLoc);
   }
   CallInst *createFPRTDeleteCall(llvm::IRBuilderBase &B, Value *V) {
     SmallVector<Value *, 1> Args;
     Args.push_back(V);
+    if (isVecOfFromType(V->getType())) {
+      ElementCount EC = cast<VectorType>(V->getType())->getElementCount();
+      return createVecFPRTFuncCall(B, EC, "delete", "delete", Args, 
+                                   VectorType::get(B.getVoidTy(), EC), 
+                                   UnknownLoc);
+    }
     return createFPRTGeneric(B, "delete", Args, B.getVoidTy(), UnknownLoc);
   }
   // This will result in a unique string for each location, which means the
@@ -505,6 +543,22 @@ public:
       llvm_unreachable("Unexpected instruction for conversion to FPRT");
     }
     createOriginalFPRTFunc(I, Name, ArgsIn, RetTy);
+    if (hasVecOfFromType(ArgsIn)) {
+      if (RetTy->isVectorTy()) {
+        ElementCount EC = getVecFPRTFuncEC(I, ArgsIn, cast<VectorType>(RetTy));
+        std::string scalarName = Name;
+        if (auto II = dyn_cast<IntrinsicInst>(&I)) {
+          if (Intrinsic::isOverloaded(II->getIntrinsicID())) {
+            scalarName = getScalarIntrinsicFuncName(*II);
+          }
+        }
+        return createVecFPRTFuncCall(B, EC, Name, scalarName, ArgsIn, 
+                                     cast<VectorType>(RetTy), 
+                                     getUniquedLocStr(&I));
+      } else {
+        llvm_unreachable("Unexpected reduction inst for conversion to FPRT");
+      }
+    }
     return createFPRTGeneric(B, Name, ArgsIn, RetTy, getUniquedLocStr(&I));
   }
 };
@@ -722,7 +776,7 @@ public:
   Value *truncate(IRBuilder<> &B, Value *v) {
     switch (Mode) {
     case TruncMemMode:
-      if (isa<ConstantFP>(v))
+      if (isa<ConstantFP>(v) || isVecOfConst(v))
         return createFPRTConstCall(B, v);
       return floatMemTruncate(B, v, TC);
     case TruncOpMode:
@@ -746,11 +800,7 @@ public:
   void visitUnaryOperator(UnaryOperator &I) {
     switch (I.getOpcode()) {
     case UnaryOperator::FNeg: {
-      if (isVecOfFromType(I.getOperand(0)->getType())) {
-        EmitWarning("FPNoFollow", I, 
-                    "Will not follow FP through this vector operand.", I);
-      }
-      if (I.getOperand(0)->getType() != getFromType())
+      if (I.getOperand(0)->getType()->getScalarType() != getFromType())
         return;
       if (!TC.isToFPRT())
         return;
@@ -778,11 +828,7 @@ public:
     case TruncMemMode: {
       auto LHS = getNewFromOriginal(CI.getOperand(0));
       auto RHS = getNewFromOriginal(CI.getOperand(1));
-      if (isVecOfFromType(LHS->getType())) {
-        EmitWarning("FPNoFollow", CI, 
-                    "Will not follow FP through this vector operand.", CI);
-      }
-      if (LHS->getType() != getFromType())
+      if (LHS->getType()->getScalarType() != getFromType())
         return;
 
       auto newI = getNewFromOriginal(&CI);
@@ -794,9 +840,11 @@ public:
       Args.push_back(truncLHS);
       Args.push_back(truncRHS);
       Instruction *nres;
-      if (TC.isToFPRT())
-        nres = createFPRTOpCall(B, CI, B.getInt1Ty(), Args);
-      else
+      if (TC.isToFPRT()) {
+        assert(newI->getType()->isVectorTy() || 
+               (newI->getType() == B.getInt1Ty()));
+        nres = createFPRTOpCall(B, CI, newI->getType(), Args);
+      } else
         nres =
             cast<FCmpInst>(B.CreateFCmp(CI.getPredicate(), truncLHS, truncRHS));
       nres->takeName(newI);
@@ -828,21 +876,14 @@ public:
     case TruncMemMode: {
       auto newI = getNewFromOriginal(&CI);
       auto newSrc = newI->getOperand(0);
-      if (isVecOfFromType(CI.getSrcTy())) {
-        EmitWarning("FPNoFollow", CI, 
-                    "Will not follow FP through this vector operand.", CI);
-      } else if (isVecOfFromType(CI.getDestTy())) {
-        EmitWarning("FPNoFollow", CI, 
-                    "Will not follow FP through this vector operand.", CI);
-      }
-      if (CI.getSrcTy() == getFromType()) {
+      if (CI.getSrcTy()->getScalarType() == getFromType()) {
         IRBuilder<> B(newI);
-        if (isa<Constant>(newSrc))
+        if (isa<Constant>(newSrc) || isVecOfConst(newSrc))
           return;
         newI->setOperand(0, createFPRTGetCall(B, newSrc));
         EmitWarning("FPNoFollow", CI, "Will not follow FP through this cast.",
                     CI);
-      } else if (CI.getDestTy() == getFromType()) {
+      } else if (CI.getDestTy()->getScalarType() == getFromType()) {
         IRBuilder<> B(newI->getNextNode());
         EmitWarning("FPNoFollow", CI, "Will not follow FP through this cast.",
                     CI);
@@ -863,11 +904,7 @@ public:
   void visitSelectInst(llvm::SelectInst &SI) {
     switch (Mode) {
     case TruncMemMode: {
-      if (isVecOfFromType(SI.getType())) {
-        EmitWarning("FPNoFollow", SI, 
-                    "Will not follow FP through this vector operand.", SI);
-      }
-      if (SI.getType() != getFromType())
+      if (SI.getType()->getScalarType() != getFromType())
         return;
       auto newI = getNewFromOriginal(&SI);
       IRBuilder<> B(newI);
@@ -896,16 +933,8 @@ public:
     auto oldLHS = BO.getOperand(0);
     auto oldRHS = BO.getOperand(1);
 
-    if (isVecOfFromType(oldLHS->getType())) {
-      EmitWarning("FPNoFollow", BO, 
-                  "Will not follow FP through this LHS vector operand.", BO);
-    }
-    if (isVecOfFromType(oldRHS->getType())) {
-      EmitWarning("FPNoFollow", BO, 
-                  "Will not follow FP through this RHS vector operand.", BO);
-    }
-    if (oldLHS->getType() != getFromType() &&
-        oldRHS->getType() != getFromType())
+    if (oldLHS->getType()->getScalarType() != getFromType() &&
+        oldRHS->getType()->getScalarType() != getFromType())
       return;
 
     switch (BO.getOpcode()) {
@@ -935,7 +964,11 @@ public:
     Instruction *nres = nullptr;
     if (TC.isToFPRT()) {
       SmallVector<Value *, 2> Args({newLHS, newRHS});
-      nres = createFPRTOpCall(B, BO, getToType(), Args);
+      Type *toType = isVecOfFromType(newI->getType()) ?
+                     getVecToType(cast<VectorType>(newI->getType())
+                                  ->getElementCount()) :
+                     getToType();
+      nres = createFPRTOpCall(B, BO, toType, Args);
     } else {
       nres = cast<Instruction>(B.CreateBinOp(BO.getOpcode(), newLHS, newRHS));
     }
@@ -978,11 +1011,7 @@ public:
     bool hasFromType = false;
     SmallVector<Value *, 2> new_ops(CI.arg_size());
     for (unsigned i = 0; i < CI.arg_size(); ++i) {
-      if (isVecOfFromType(orig_ops[i]->getType())) {
-        EmitWarning("FPNoFollow", CI, 
-                    "Will not follow FP through this vector arg.", CI);
-      }
-      if (orig_ops[i]->getType() == getFromType()) {
+      if (orig_ops[i]->getType()->getScalarType() == getFromType()) {
         new_ops[i] = truncate(B, getNewFromOriginal(orig_ops[i]));
         hasFromType = true;
       } else {
@@ -990,13 +1019,11 @@ public:
       }
     }
     Type *retTy = CI.getType();
-    if (isVecOfFromType(CI.getType())) {
-      EmitWarning("FPNoFollow", CI, 
-                  "Will not follow FP through this vector ret type.", CI);
-    }
-    if (CI.getType() == getFromType()) {
+    if (CI.getType()->getScalarType() == getFromType()) {
       hasFromType = true;
-      retTy = getToType();
+      retTy = isVecOfFromType(CI.getType())? 
+              getVecToType(cast<VectorType>(CI.getType())->getElementCount()) :
+              getToType();
     }
 
     if (!hasFromType)
@@ -1028,15 +1055,12 @@ public:
     case TruncMemMode: {
       if (I.getNumOperands() == 0)
         return;
-      if (isVecOfFromType(I.getReturnValue()->getType())) {
-        EmitWarning("FPNoFollow", I, 
-                    "Will not follow FP through this vector return value.", I);
-      }
-      if (I.getReturnValue()->getType() != getFromType())
+      if (I.getReturnValue()->getType()->getScalarType() != getFromType())
         return;
       auto newI = cast<llvm::ReturnInst>(getNewFromOriginal(&I));
       IRBuilder<> B(newI);
-      if (isa<ConstantFP>(newI->getOperand(0)))
+      if (isa<ConstantFP>(newI->getOperand(0)) || 
+          isVecOfConst(newI->getOperand(0)))
         newI->setOperand(0, createFPRTConstCall(B, newI->getReturnValue()));
       return;
     }
@@ -1063,13 +1087,9 @@ public:
                         llvm::SyncScope::ID syncScope, llvm::Value *mask) {
     switch (Mode) {
     case TruncMemMode: {
-      if (isVecOfFromType(orig_val->getType())) {
-        EmitWarning("FPNoFollow", I, 
-                    "Will not follow FP through this vector store value.", I);
-      }
-      if (orig_val->getType() != getFromType())
+      if (orig_val->getType()->getScalarType() != getFromType())
         return;
-      if (!isa<ConstantFP>(orig_val))
+      if (!isa<ConstantFP>(orig_val) && !isVecOfConst(orig_val))
         return;
       auto newI = getNewFromOriginal(&I);
       IRBuilder<> B(newI);
@@ -1249,11 +1269,7 @@ public:
   void visitPHINode(llvm::PHINode &PN) {
     switch (Mode) {
     case TruncMemMode: {
-      if (isVecOfFromType(PN.getType())) {
-        EmitWarning("FPNoFollow", PN, 
-                    "Will not follow FP through this vector PHI node.", PN);
-      }
-      if (PN.getType() != getFromType())
+      if (PN.getType()->getScalarType() != getFromType())
         return;
       auto NewPN = cast<llvm::PHINode>(getNewFromOriginal(&PN));
       IRBuilder<> B(&*NewPN->getParent()
@@ -1261,7 +1277,8 @@ public:
                           ->getEntryBlock()
                           .getFirstNonPHIIt());
       for (unsigned It = 0; It < NewPN->getNumIncomingValues(); It++) {
-        if (isa<ConstantFP>(NewPN->getIncomingValue(It))) {
+        if (isa<ConstantFP>(NewPN->getIncomingValue(It)) || 
+            isVecOfConst(NewPN->getIncomingValue(It))) {
           NewPN->setOperand(
               It, createFPRTConstCall(B, NewPN->getIncomingValue(It)));
         }

@@ -116,9 +116,11 @@ private:
     return std::string(RaptorPrefix) + RTName + "_" + TC.mangleFrom() + "_" +
            Name;
   }
-  std::string getVecFPRTName(std::string Name, bool isScalable, unsigned fixedLen) {
-    return std::string(RaptorPrefix) + RTName + "_vec" + (isScalable? "nx" : "") + 
-           Twine(fixedLen).str() + "x_" + TC.mangleFrom() + "_" + Name;
+  std::string getVecFPRTName(std::string Name, bool isScalable, 
+                             unsigned fixedLen) {
+    return std::string(RaptorPrefix) + RTName + "_vec" + 
+           (isScalable? "nx" : "") + Twine(fixedLen).str() + "x_" + 
+           TC.mangleFrom() + "_" + Name;
   }
 
   // Creates a function which contains the original floating point operation.
@@ -214,7 +216,8 @@ private:
     SmallVector<Intrinsic::IITDescriptor, 8> Table;
     getIntrinsicInfoTableEntries(ID, Table);
     ArrayRef<Intrinsic::IITDescriptor> TableRef = Table;
-    Intrinsic::matchIntrinsicSignature(II.getCalledFunction()->getFunctionType(), TableRef, vecTypes);
+    Intrinsic::matchIntrinsicSignature(
+      II.getCalledFunction()->getFunctionType(), TableRef, vecTypes);
     SmallVector<Type *, 4> scalarTypes;
     for (auto ty : vecTypes) {
       if (auto vecType = dyn_cast<VectorType>(ty)) {

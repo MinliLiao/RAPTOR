@@ -1294,7 +1294,9 @@ public:
         if (Mode == TruncMemMode){
           for (unsigned i = 0; i < ACS.getNumArgOperands(); ++i) {
             auto arg = ACS.getCallArgOperand(i);
-            if (arg && arg->getType() == getFromType() && isa<ConstantFP>(arg)) {
+            if (arg && arg->getType()->getScalarType() == getFromType() &&
+               (isa<ConstantFP>(arg) || isVecOfConst(arg))
+            ) {
               newCall->setArgOperand(ACS.getCallArgOperandNo(i), 
                 truncate(BuilderZ, getNewFromOriginal(arg)));
             }

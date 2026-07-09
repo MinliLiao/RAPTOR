@@ -190,6 +190,18 @@ private:
       llvm_unreachable(
         "Unexpected inst with different vec sizes for vec conversion to FPRT");
     assert(hasVecFromType && allVecSizeMatch);
+    if (dyn_cast<VPIntrinsic>(&I))
+      llvm_unreachable(
+        "Unexpected vector predicate intrinsic for vec conversion to FPRT");
+    if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I)) {
+      std::string Name = Intrinsic::getBaseName(II->getIntrinsicID()).str();
+      if (Name.substr(0,11) == "llvm.vector")
+        llvm_unreachable(
+          "Unexpected vec reduce or manip intr for vec conversion to FPRT");
+      if (Name.substr(0,11) == "llvm.matrix")
+        llvm_unreachable(
+          "Unexpected matrix intrinsic for vec conversion to FPRT");
+    }
     return EC;
   }
 

@@ -3,7 +3,7 @@
 declare double @pow(double %Val, double %Power)
 ; declare double @llvm.pow.f64(double %Val, double %Power)
 ; declare double @llvm.powi.f64.i16(double %Val, i16 %power)
-; declare void @llvm.nvvm.barrier0()
+declare void @llvm.nvvm.barrier0()
 
 define double @f(double %x, double %y) {
   %res0 = call double @pow(double %x, double %y)

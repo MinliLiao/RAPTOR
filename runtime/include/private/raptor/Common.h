@@ -131,4 +131,13 @@ template <typename To, typename From> To checked_raptor_bitcast(From from) {
 
 #include "raptor/FloatTypes.def"
 
+#define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                     \
+  __RAPTOR_MPFR_DECL_ATTRIBUTES                                                \
+  unsigned int __raptor_mca_get_virtural_prec_##FROM_TY(mpfr_t a,              \
+                                                        const char *loc);      \
+  __RAPTOR_MPFR_DECL_ATTRIBUTES                                                \
+  void __raptor_mca_inexact_##FROM_TY(mpfr_t a, unsigned int virtual_prec,     \
+                                      mpfr_rnd_t rnd_mode);
+#include "raptor/FloatTypes.def"
+
 #endif // _RAPTOR_COMMON_H_

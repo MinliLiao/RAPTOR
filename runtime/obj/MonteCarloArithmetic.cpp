@@ -1,0 +1,466 @@
+#include <iostream>
+#include <type_traits>
+
+#ifndef __RAPTOR_VERIFICARLOMCA_MODE
+  #ifdef __RAPTOR_VERIFICARLOMCA_INT_MODE
+    #define __RAPTOR_VERIFICARLOMCA_MODE
+  #endif
+#endif
+
+// verificarlo uses _Float128 that needs extra definition
+#ifdef __RAPTOR_VERIFICARLOMCA_MODE
+  // Clang has "unknown type name" error for _Float128 on x86
+  #if defined(__clang__) && (defined(__i386) || defined(__x86_64))
+    #define _Float128 __float128
+  #endif
+  // Need to be defined before including mpfr.h to enable binary128 support
+  #define MPFR_WANT_FLOAT128
+#endif
+// mpfr.h is included in Common.h
+#include <raptor/Common.h>
+
+#ifdef __RAPTOR_VERIFICARLOMCA_MODE
+  #define __RAPTOR_USE_VERIFICARLOMCA true
+  // Includes needed to define interface to verificarlo
+  #include <argp.h>
+  #include <err.h>
+  #include <stdlib.h>
+  #include <stdio.h>
+  #include <string.h>
+  #include <strings.h>
+  #include <sys/syscall.h>
+  #include <sys/time.h>
+  #include <sys/types.h> 
+  #include <unistd.h>
+  // Macros to help get function names of the corresponding backend
+  #define __RAPTOR_VERIFICARLOMCA_CONCAT(prefix,name,suffix) \
+    prefix##name##suffix
+  #define __RAPTOR_VERIFICARLOMCA_INTERFLOP_API(BACKENDNAME, name) \
+    __RAPTOR_VERIFICARLOMCA_CONCAT(INTERFLOP_, BACKENDNAME, _API)(name)
+  #define __RAPTOR_VERIFICARLOMCA_INEXACT(backendname, bits) \
+    __RAPTOR_VERIFICARLOMCA_CONCAT(_, backendname, _inexact_binary##bits)
+  #define __RAPTOR_VERIFICARLOMCA_CONTEXT_T(backendname) \
+    __RAPTOR_VERIFICARLOMCA_CONCAT(, backendname, _context_t)
+  #if defined(__cplusplus)
+  extern "C" {
+  #endif
+  // Typedefs copied from verificarlo repo file
+  // src/interflop-stdlib/interflop_stdlib.h
+  typedef void (*interflop_panic_t)(const char *msg);
+  typedef void File;
+  // Function signature copied from verificarlo repo file
+  // src/interflop-stdlib/interflop_stdlib.c
+  extern void interflop_set_handler(const char *name, void *function_ptr);
+  #ifdef __RAPTOR_VERIFICARLOMCA_INT_MODE
+    #define __RAPTOR_VERIFICARLOMCA_BACKENDNAME MCAINT
+    #define __RAPTOR_VERIFICARLOMCA_backendname mcaint
+    // Macro copied from verificarlo repo backends files
+    // src/backends/interflop-backend-mcaint/interflop_mca.h
+    #define INTERFLOP_MCAINT_API(name) interflop_mcaint_##name
+    // Function signatures copied from verificarlo repo backends files
+    // src/backends/interflop-backend-mcaint/interflop_mca.c
+    extern void INTERFLOP_MCAINT_API(pre_init)(interflop_panic_t panic, 
+                                               File *stream, void **context);
+    extern void INTERFLOP_MCAINT_API(cli)(int argc, char **argv, 
+                                          void *context);
+    extern void INTERFLOP_MCAINT_API(configure)(void *configure, 
+                                                void *context);
+    extern void _mcaint_inexact_binary64(double *da, void *context);
+    extern void _mcaint_inexact_binary128(_Float128 *qa, void *context);
+  #else
+    #define __RAPTOR_VERIFICARLOMCA_BACKENDNAME MCAQUAD
+    #define __RAPTOR_VERIFICARLOMCA_backendname mcaquad
+    // Macro copied from verificarlo repo backends files
+    // src/backends/interflop-backend-mcaint/interflop_mca_int.h
+    #define INTERFLOP_MCAQUAD_API(name) interflop_mcaquad_##name
+    // Function signatures copied from verificarlo repo backends files
+    // src/backends/interflop-backend-mcaint/interflop_mca_int.c
+    extern void INTERFLOP_MCAQUAD_API(pre_init)(interflop_panic_t panic, 
+                                                File *stream, void **context);
+    extern void INTERFLOP_MCAQUAD_API(cli)(int argc, char **argv, 
+                                           void *context);
+    extern void INTERFLOP_MCAQUAD_API(configure)(void *configure, 
+                                                 void *context);
+    extern void _mcaquad_inexact_binary64(double *da, void *context);
+    extern void _mcaquad_inexact_binary128(_Float128 *qa, void *context);
+  #endif
+  #if defined(__cplusplus)
+  }
+  #endif
+  
+  // Enclose types/functions to interface with verificarlo in unnamed namespace
+  namespace {
+    // Typedef copied from verificarlo repo file
+    // src/interflop-stdlib/interflop_stdlib.h
+    typedef unsigned int IUint32_t;
+    typedef long int IInt64_t;
+    typedef unsigned long int IUint64_t;
+    typedef int IBool;
+
+    // Definitions adapted from verificarlo repo backends files
+    // src/backends/interflop-backend-mcaint/interflop_mca_int.h and
+    // src/backends/interflop-backend-mcaquad/interflop_mca.h
+    // These definitions from mcaint and mcaquad are compatible so defining
+    // only once here.
+    /* define the available MCA modes of operation */
+    typedef enum {
+      mca_mode_ieee,
+      mca_mode_mca,
+      mca_mode_pb,
+      mca_mode_rr,
+      _mca_mode_end_
+    } mca_mode;
+
+    /* define the available error modes */
+    typedef enum {
+      mca_err_mode_rel,
+      mca_err_mode_abs,
+      mca_err_mode_all,
+      _mca_err_mode_end_
+    } mca_err_mode;
+
+    /* Interflop context */
+    typedef struct {
+      IUint64_t seed;
+      float sparsity;
+      int binary32_precision;
+      int binary64_precision;
+      int absErr_exp;
+      IBool relErr;
+      IBool absErr;
+      IBool daz;
+      IBool ftz;
+      IBool choose_seed;
+      mca_mode mode;
+    } mcaquad_context_t;
+
+    /* Interflop context */
+    typedef struct {
+      IBool relErr;
+      IBool absErr;
+      IBool daz;
+      IBool ftz;
+      IBool choose_seed;
+      mca_mode mode;
+      int binary32_precision;
+      int binary64_precision;
+      int absErr_exp;
+      float sparsity;
+      IUint64_t seed;
+    } mcaint_context_t;
+
+    using mca_context_t = __RAPTOR_VERIFICARLOMCA_CONTEXT_T(
+      __RAPTOR_VERIFICARLOMCA_backendname);
+
+    typedef struct {
+      IUint64_t seed;
+      float sparsity; 
+      IUint32_t precision_binary32;
+      IUint32_t precision_binary64;
+      mca_mode mode;
+      mca_err_mode err_mode;
+      IInt64_t max_abs_err_exponent;
+      IUint32_t daz;
+      IUint32_t ftz;
+    } mca_conf_t;
+
+    // Helper type for compile time type check
+    template<typename T>
+    using is_float_t = std::enable_if_t<std::is_same_v<T, float>, bool>;
+    template<typename T>
+    using is_double_t = std::enable_if_t<std::is_same_v<T, double>, bool>;
+    template<typename T>
+    using is__Float128_t = std::enable_if_t<std::is_same_v<T, _Float128>, 
+                                            bool>;
+    template<typename T>
+    using is_float_or_double_t = std::enable_if_t<
+      std::is_same_v<T, float> || std::is_same_v<T, double>, bool>;
+    template<typename T>
+    using is_double_or__Float128_t = std::enable_if_t<
+      std::is_same_v<T, double> || std::is_same_v<T, _Float128>, bool>;
+    template<typename T, is_float_or_double_t<T> = true>
+    using inexact_t = std::conditional_t<std::is_same_v<T, float>, double, 
+                                                                   _Float128>;
+    // Using a struct because the context needs initialization
+    struct verificarlo_mca_context_t {
+      // Context used for the _mca*_inexact_binary64 functions
+      void * context = nullptr;
+      verificarlo_mca_context_t();
+    };
+    // Global so that it gets automatically initialized through construction
+    verificarlo_mca_context_t verificarlo_mca_context;
+
+    // Set the context with configure
+    void set_verificarlo_mca_context(void *configure, void *context) {
+      __RAPTOR_VERIFICARLOMCA_INTERFLOP_API(
+        __RAPTOR_VERIFICARLOMCA_BACKENDNAME, configure)(configure, context);
+    }
+    void set_verificarlo_mca_context(int argc, char **argv, void *context) {
+      __RAPTOR_VERIFICARLOMCA_INTERFLOP_API(
+        __RAPTOR_VERIFICARLOMCA_BACKENDNAME, cli)(argc, argv, context);
+    }
+    // Returns the virtual precision used for MCA of floating point type T
+    template<typename T, is_float_t<T> = true>
+    IUint32_t get_virtual_prec(void * context) {
+      return ((mca_context_t *)context)->binary32_precision;
+    }
+    template<typename T, is_double_t<T> = true>
+    IUint32_t get_virtual_prec(void * context) {
+      return ((mca_context_t *)context)->binary64_precision;
+    }
+    // Function and definition adapted from verificarlo repo file 
+    // src/vfcwrapper/main.c.in
+    static constexpr int MAX_ARGS=256;
+    void get_args_from_str(char *str, const char *err_msg_prefix, int &argc, 
+                           char *argv[MAX_ARGS]){
+      if (str != NULL) {
+        char *spaceptr;
+        char *arg = strtok_r(str, " ", &spaceptr);
+        while (arg) {
+          if (argc >= MAX_ARGS) {
+            fprintf(stderr, "%s syntax error: too many arguments", 
+                    err_msg_prefix);
+          }
+          argv[argc++] = arg;
+          arg = strtok_r(NULL, " ", &spaceptr);
+        }
+        argv[argc] = NULL;
+      }
+    }
+    // Set the virtual precision used for MCA of floating point type T
+    template<typename T, is_float_t<T> = true>
+    void set_virtual_prec(void * context, IUint32_t virtual_prec) {
+      int argc;
+      char *argv[MAX_ARGS];
+      std::string str = "dummy --precision-binary32=" + 
+                        std::to_string(virtual_prec);
+      get_args_from_str(str.data(), "set_virtual_prec 32", argc, argv);
+      set_verificarlo_mca_context(argc, argv, context);
+    }
+    template<typename T, is_double_t<T> = true>
+    void set_virtual_prec(void * context, IUint32_t virtual_prec) {
+      int argc;
+      char *argv[MAX_ARGS];
+      std::string str = "dummy --precision-binary64=" + 
+                        std::to_string(virtual_prec);
+      get_args_from_str(str.data(), "set_virtual_prec 64", argc, argv);
+      set_verificarlo_mca_context(argc, argv, context);
+    }
+    // Return the high precision type used for MCA calculation from mpfr_t a, 
+    // with the rounding mode rnd_mode
+    template<typename T, is_float_t<T> = true>
+    inexact_t<T> get_inexact_t_from(mpfr_t a, mpfr_rnd_t rnd_mode) {
+      return mpfr_get_d(a, rnd_mode);
+    }
+    template<typename T, is_double_t<T> = true>
+    inexact_t<T> get_inexact_t_from(mpfr_t a, mpfr_rnd_t rnd_mode) {
+      return mpfr_get_float128(a, rnd_mode);
+    }
+    // Assigns mpfr_t a with the value of val with rnd_mode rounding mode,
+    // where val is of the high precision type used for MCA calculation.
+    // Returns the return value from mpfr_set_* used underneath.
+    template<typename T, is_float_t<T> = true>
+    int assign_inexact_t_to(mpfr_t a, inexact_t<T> val, mpfr_rnd_t rnd_mode) {
+      return mpfr_set_d(a, val, rnd_mode);
+    }
+    template<typename T, is_double_t<T> = true>
+    int assign_inexact_t_to(mpfr_t a, inexact_t<T> val, mpfr_rnd_t rnd_mode) {
+      return mpfr_set_float128(a, val, rnd_mode);
+    }
+    // Apply MCA random perturbation to a of type T, with the parameters for 
+    // MCA defined in context
+    template<typename T, is_double_t<T> = true>
+    void mca_inexact(T &a, void *context) {
+      __RAPTOR_VERIFICARLOMCA_INEXACT(__RAPTOR_VERIFICARLOMCA_backendname, 
+                                      64)(&a, context);
+    }
+    template<typename T, is__Float128_t<T> = true>
+    void mca_inexact(T &a, void *context) {
+      __RAPTOR_VERIFICARLOMCA_INEXACT(__RAPTOR_VERIFICARLOMCA_backendname, 
+                                      128)(&a, context);
+    }
+
+    #if defined(__cplusplus)
+    extern "C" {
+    #endif
+    // Function definitions copied from verificarlo repo file
+    // src/vfcwrapper/main.c.in
+    void _vfc_panic(const char *msg) { fprintf(stderr, "%s", msg); exit(1);}
+    pid_t get_tid() { return syscall(__NR_gettid); }
+    long _vfc_strtol(const char *nptr, char **endptr, int *error) {
+      *error = 0;
+      errno = 0;
+      long val = strtoll(nptr, endptr, 10);
+      if (errno != 0) {
+        *error = 1;
+      }
+      return val;
+    }
+    double _vfc_strtod(const char *nptr, char **endptr, int *error) {
+      *error = 0;
+      errno = 0;
+      double val = strtod(nptr, endptr);
+      if (errno != 0) {
+        *error = 1;
+      }
+      return val;
+    }
+    // Function adapted from verificarlo repo file 
+    // src/vfcwrapper/main.c.in
+    /* Parse the different VFC_BACKENDS variables per priorty order */
+    /* 1- VFC_BACKENDS */
+    /* 2- VFC_BACKENDS_FROM_FILE */
+    /* Set the backends read in vfc_backends */
+    /* Set the name of the environment variable read in vfc_backends_env */
+    void parse_vfc_backends_env(int &backend_argc, char *backend_argv[MAX_ARGS]) {
+      char *vfc_backends_v = NULL;
+      const char *vfc_backends_env_v = NULL;
+      char ** vfc_backends = &vfc_backends_v;
+      const char ** vfc_backends_env = &vfc_backends_env_v;
+
+      /* Parse VFC_BACKENDS */
+      *vfc_backends_env = "VFC_BACKENDS";
+      char *env_val = getenv(*vfc_backends_env);
+      if (env_val != NULL) {
+        size_t env_len = strlen(env_val);
+        *vfc_backends = (char *)malloc(env_len + 1);
+        if (*vfc_backends == NULL) {
+          fprintf(stderr, "Memory allocation failed for %s", *vfc_backends_env);
+        }
+        strcpy(*vfc_backends, env_val);
+      } else {
+        *vfc_backends = NULL;
+      }
+
+      /* Parse VFC_BACKENDS_FROM_FILE if VFC_BACKENDS is empty*/
+      if (*vfc_backends == NULL) {
+        *vfc_backends_env = "VFC_BACKENDS_FROM_FILE";
+        char *vfc_backends_fromfile_file = getenv(*vfc_backends_env);
+        if (vfc_backends_fromfile_file != NULL) {
+          FILE *fi = fopen(vfc_backends_fromfile_file, "r");
+          if (fi == NULL) {
+            fprintf(stderr, "Error while opening file pointed by %s: %s",
+                        *vfc_backends_env, strerror(errno));
+          } else {
+            size_t len = 0;
+            ssize_t nread;
+            nread = getline(vfc_backends, &len, fi);
+            if (nread == -1) {
+              fprintf(stderr, "Error while reading file pointed by %s: %s",
+                          *vfc_backends_env, strerror(errno));
+            } else {
+              if ((*vfc_backends)[nread - 1] == '\n') {
+                (*vfc_backends)[nread - 1] = '\0';
+              }
+            }
+          }
+        }
+      }
+      
+      get_args_from_str(vfc_backends_v, vfc_backends_env_v, backend_argc, 
+                        backend_argv);
+    }
+    #if defined(__cplusplus)
+    }
+    #endif
+
+    // Interflop needs some set up, then allocate and set context
+    verificarlo_mca_context_t::verificarlo_mca_context_t() {
+      interflop_set_handler("argp_parse", (void *)argp_parse);
+      interflop_set_handler("panic", (void *)_vfc_panic);
+      interflop_set_handler("exit", (void *)exit);
+      interflop_set_handler("fopen", (void *)fopen);
+      interflop_set_handler("fprintf", (void *)fprintf);
+      interflop_set_handler("getenv", (void *)getenv);
+      interflop_set_handler("gettid", (void *)get_tid);
+      interflop_set_handler("malloc", (void *)malloc);
+      interflop_set_handler("sprintf", (void *)sprintf);
+      interflop_set_handler("strcasecmp", (void *)strcasecmp);
+      interflop_set_handler("strerror", (void *)strerror);
+      interflop_set_handler("strtol", (void *)_vfc_strtol);
+      interflop_set_handler("strtod", (void *)_vfc_strtod);
+      interflop_set_handler("vfprintf", (void *)vfprintf);
+      interflop_set_handler("vwarnx", (void *)vwarnx);
+      interflop_set_handler("gettimeofday", (void *)gettimeofday);
+      // pre_init also allocates and initialize the context
+      __RAPTOR_VERIFICARLOMCA_INTERFLOP_API(
+        __RAPTOR_VERIFICARLOMCA_BACKENDNAME, pre_init)(
+          _vfc_panic, stderr, &context);
+      // Skipping interflop init since it is mostly registering hooked function
+      // for instrumentation (and we are doing it in RAPTOR instead)
+      int backend_argc = 0;
+      char *backend_argv[MAX_ARGS];
+      parse_vfc_backends_env(backend_argc, backend_argv);
+      if (backend_argc > 0) {
+        set_verificarlo_mca_context(backend_argc, backend_argv, context);
+      } else {
+        // Default configuration used to initialize the context
+        // Also used to set the context when configuration changes
+        mca_conf_t mca_conf = {
+          .seed = 0ULL, // Default to 0, but always sets the seed to chosen
+          // If random (0,1) num > sparsity, MCA is not applied.
+          .sparsity = 1.0f, // Always apply MCA
+          // Between 1 and double precision pseudo-mantissa encoding size (52)
+          .precision_binary32 = 24, // default to float mantissa size (23+1)
+          // Between 1 and quad precision pseudo mantissa encoding size (112)
+          .precision_binary64 = 53, // default to double mantissa size (52+1)
+          // Only add inexact to input operands.
+          .mode = mca_mode::mca_mode_pb, // Irrelevant for inexact.
+          // The mode matching formula (1) in Verificarlo
+          .err_mode = mca_err_mode::mca_err_mode_rel,
+          // Unused for relative error mode mca_err_mode_rel
+          .max_abs_err_exponent = 112, // default from verificarlo set to 112
+          // Default to false, not dealing with this now 
+          .daz = 0, // 0 for false, 1 for true
+          .ftz = 0 // 0 for false, 1 for true
+        };
+        set_verificarlo_mca_context(&mca_conf, context);
+      }
+    }
+  } // end of unnamed namespace
+
+  // verificarlo does not change virtual precision mid run, just get from conf
+  #define __RAPTOR_VERIFICARLOMCA_get_virtual_prec(CPP_TY)                     \
+    do {                                                                       \
+      return get_virtual_prec<CPP_TY>(verificarlo_mca_context.context);        \
+    } while (0)
+  
+  #define __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode)   \
+    do {                                                                       \
+      if (virtual_prec !=                                                      \
+          get_virtual_prec<CPP_TY>(verificarlo_mca_context.context)            \
+      ) {                                                                      \
+        set_virtual_prec<CPP_TY>(verificarlo_mca_context.context,virtual_prec);\
+      }                                                                        \
+      inexact_t<CPP_TY> high_prec_a = get_inexact_t_from<CPP_TY>(a, rnd_mode); \
+      mca_inexact(high_prec_a, verificarlo_mca_context.context);               \
+      assign_inexact_t_to<CPP_TY>(a, high_prec_a, rnd_mode);                   \
+    } while (0)    
+#else
+  #define __RAPTOR_USE_VERIFICARLOMCA false
+  #define __RAPTOR_VERIFICARLOMCA_get_virtual_prec(CPP_TY)
+  #define __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode)
+#endif // __RAPTOR_VERIFICARLOMCA_MODE
+
+#define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                     \
+  unsigned int __raptor_mca_get_virtural_prec_##FROM_TY(mpfr_t a,              \
+                                                        const char *loc) {     \
+    if constexpr (__RAPTOR_USE_VERIFICARLOMCA) {                               \
+      __RAPTOR_VERIFICARLOMCA_get_virtual_prec(CPP_TY);                        \
+    } else {                                                                   \
+      std::cerr << "__raptor_mca_get_virtural_prec_" << #FROM_TY;              \
+      std::cerr << " is not implemented." << std::endl;                        \
+      abort();                                                                 \
+    }                                                                          \
+  }                                                                            \
+  void __raptor_mca_inexact_##FROM_TY(mpfr_t a, unsigned int virtual_prec,     \
+                                      mpfr_rnd_t rnd_mode) {                   \
+    if constexpr (__RAPTOR_USE_VERIFICARLOMCA) {                               \
+      __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode);      \
+    } else {                                                                   \
+      std::cerr << "__raptor_mca_inexact_" << #FROM_TY;                        \
+      std::cerr << " is not implemented." << std::endl;                        \
+      abort();                                                                 \
+    }                                                                          \
+  }
+#include "raptor/FloatTypes.def"

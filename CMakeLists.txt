@@ -369,6 +369,23 @@ install(PROGRAMS
   "${CMAKE_CURRENT_SOURCE_DIR}/scripts/raptor_plot_float_histogram.py"
   DESTINATION bin)
 
+if (DEFINED __RAPTOR_VERIFICARLOMCA_LIB_PATH)
+  if (__RAPTOR_VERIFICARLOMCA_LIB_PATH MATCHES "libinterflop_mca.so")
+    string(APPEND CMAKE_CXX_FLAGS " -D__RAPTOR_VERIFICARLOMCA_MODE")
+  elseif (__RAPTOR_VERIFICARLOMCA_LIB_PATH MATCHES "libinterflop_mca_int.so")
+    string(APPEND CMAKE_CXX_FLAGS " -D__RAPTOR_VERIFICARLOMCA_INT_MODE")
+  else()
+    message(SEND_ERROR "__RAPTOR_VERIFICARLOMCA_LIB_PATH ${__RAPTOR_VERIFICARLOMCA_LIB_PATH} does not include the expected library name")
+    if (NOT EXISTS "${__RAPTOR_VERIFICARLOMCA_LIB_PATH}")
+      message(SEND_ERROR "__RAPTOR_VERIFICARLOMCA_LIB_PATH ${__RAPTOR_VERIFICARLOMCA_LIB_PATH} does not exists")
+    endif()
+  endif()
+
+  add_library(verificarlo SHARED IMPORTED)
+  set_target_properties(verificarlo PROPERTIES
+    IMPORTED_LOCATION "${__RAPTOR_VERIFICARLOMCA_LIB_PATH}"
+  )
+endif()
 add_subdirectory(runtime)
 add_subdirectory(test)
 add_subdirectory(wrappers)

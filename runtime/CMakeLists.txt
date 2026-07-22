@@ -3,6 +3,7 @@ add_library(
   Raptor-RT-${LLVM_VERSION_MAJOR}
   obj/Counting.cpp
   obj/GarbageCollection.cpp
+  obj/MonteCarloArithmetic.cpp
   ir/Mpfr.cpp
   ir/Fprt.cpp
   ir/Log.cpp

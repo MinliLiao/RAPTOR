@@ -107,9 +107,11 @@ config.substitutions.append(('%loadLLDRaptor', newPM))
 
 
 verificarlomca_lib_path = "@__RAPTOR_VERIFICARLOMCA_LIB_PATH@"
-verificarlomca_lib_dir = "/".join(verificarlomca_lib_path.split("/")[:-1])
-verificarlomca_lib_name = verificarlomca_lib_path.split("/")[-1].split(".")[0][3:]
-verificarlomca_link_options = " -L" + verificarlomca_lib_dir + " -l" + verificarlomca_lib_name + " -linterflop_stdlib"
+verificarlomca_link_options = ""
+if verificarlomca_lib_path != "":
+  verificarlomca_lib_dir = "/".join(verificarlomca_lib_path.split("/")[:-1])
+  verificarlomca_lib_name = verificarlomca_lib_path.split("/")[-1].split(".")[0][3:]
+  verificarlomca_link_options = " -L" + verificarlomca_lib_dir + " -l" + verificarlomca_lib_name + " -linterflop_stdlib"
 
 link = "-L@RAPTOR_BINARY_DIR@/runtime/ -lstdc++ -lmpfr -lRaptor-RT-" + config.llvm_ver + verificarlomca_link_options
 config.substitutions.append(('%linkRaptorRT', link))

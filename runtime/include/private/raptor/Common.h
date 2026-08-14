@@ -137,7 +137,7 @@ template <typename To, typename From> To checked_raptor_bitcast(From from) {
                                                         const char *loc);      \
   __RAPTOR_MPFR_DECL_ATTRIBUTES                                                \
   void __raptor_mca_inexact_##FROM_TY(mpfr_t a, unsigned int virtual_prec,     \
-                                      mpfr_rnd_t rnd_mode);
+                                      mpfr_rnd_t rnd_mode, bool isOutbound);
 #include "raptor/FloatTypes.def"
 
 #endif // _RAPTOR_COMMON_H_

@@ -208,6 +208,9 @@
     IUint32_t get_virtual_prec(void * context) {
       return ((mca_context_t *)context)->binary64_precision;
     }
+    mca_mode get_mode(void * context) {
+      return ((mca_context_t *)context)->mode;
+    }
     // Function and definition adapted from verificarlo repo file 
     // src/vfcwrapper/main.c.in
     static constexpr int MAX_ARGS=256;
@@ -405,7 +408,7 @@
           // Between 1 and quad precision pseudo mantissa encoding size (112)
           .precision_binary64 = 53, // default to double mantissa size (52+1)
           // Only add inexact to input operands.
-          .mode = mca_mode::mca_mode_pb, // Irrelevant for inexact.
+          .mode = mca_mode::mca_mode_pb, // default to only perturb inbound
           // The mode matching formula (1) in Verificarlo
           .err_mode = mca_err_mode::mca_err_mode_rel,
           // Unused for relative error mode mca_err_mode_rel
@@ -425,21 +428,31 @@
       return get_virtual_prec<CPP_TY>(verificarlo_mca_context.context);        \
     } while (0)
   
-  #define __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode)   \
+  #define __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode,   \
+    isOutbound)                                                                \
     do {                                                                       \
-      if (virtual_prec !=                                                      \
-          get_virtual_prec<CPP_TY>(verificarlo_mca_context.context)            \
-      ) {                                                                      \
-        set_virtual_prec<CPP_TY>(verificarlo_mca_context.context,virtual_prec);\
+      mca_mode mode = get_mode(verificarlo_mca_context.context);               \
+      bool addInexact = isOutbound ?                                           \
+        (mode == mca_mode::mca_mode_rr || mode == mca_mode::mca_mode_mca)      \
+        : (mode == mca_mode::mca_mode_pb || mode == mca_mode::mca_mode_mca);   \
+      if (addInexact) {                                                        \
+        if (virtual_prec !=                                                    \
+            get_virtual_prec<CPP_TY>(verificarlo_mca_context.context)          \
+        ) {                                                                    \
+          set_virtual_prec<CPP_TY>(verificarlo_mca_context.context,            \
+                                   virtual_prec);                              \
+        }                                                                      \
+        inexact_t<CPP_TY> high_prec_a = get_inexact_t_from<CPP_TY>(a,          \
+                                                                   rnd_mode);  \
+        mca_inexact(high_prec_a, verificarlo_mca_context.context);             \
+        assign_inexact_t_to<CPP_TY>(a, high_prec_a, rnd_mode);                 \
       }                                                                        \
-      inexact_t<CPP_TY> high_prec_a = get_inexact_t_from<CPP_TY>(a, rnd_mode); \
-      mca_inexact(high_prec_a, verificarlo_mca_context.context);               \
-      assign_inexact_t_to<CPP_TY>(a, high_prec_a, rnd_mode);                   \
     } while (0)    
 #else
   #define __RAPTOR_USE_VERIFICARLOMCA false
   #define __RAPTOR_VERIFICARLOMCA_get_virtual_prec(CPP_TY)
-  #define __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode)
+  #define __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode,   \
+                                          isOutbound)
 #endif // __RAPTOR_VERIFICARLOMCA_MODE
 
 #define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                     \
@@ -454,9 +467,10 @@
     }                                                                          \
   }                                                                            \
   void __raptor_mca_inexact_##FROM_TY(mpfr_t a, unsigned int virtual_prec,     \
-                                      mpfr_rnd_t rnd_mode) {                   \
+                                      mpfr_rnd_t rnd_mode, bool isOutbound) {  \
     if constexpr (__RAPTOR_USE_VERIFICARLOMCA) {                               \
-      __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode);      \
+      __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode,       \
+        isOutbound);                                                           \
     } else {                                                                   \
       std::cerr << "__raptor_mca_inexact_" << #FROM_TY;                        \
       std::cerr << " is not implemented." << std::endl;                        \

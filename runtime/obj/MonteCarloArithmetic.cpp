@@ -477,12 +477,137 @@
 #endif // defined(__RAPTOR_VERIFICARLOMCA_QUAD_MODE) ||
        // defined(__RAPTOR_VERIFICARLOMCA_INT_MODE)
 
+#ifdef __RAPTOR_MCALITE_MODE
+  #define __RAPTOR_USE_MCALITE true
+  #include <vector>
+  #include <mca.h>
+  namespace {
+    enum mcalite_mode { // Comment copied from mca.h
+      RR,  /* Random Rounding (RR): round(inexact(x op y)). */
+      PB,  /* Precision Bounding (PB): round(inexact(x) op inexact(y)). */
+      FULL /* Full MCA: round(inexact(inexact(x) op inexact(y))). */ 
+    };
+    struct mcalite_context_t {
+      uint64_t rng_seed = 42;
+      int t = 24; // virtual precision
+      size_t ntrials = 5; // Number of repetition per operation
+      mcalite_mode mode = mcalite_mode::PB;
+      std::vector<double> results;
+      mca_rng rng;
+      void parse_env() {
+        // Get the seed, t, ntrials and mode from env var.
+        char *env_val = getenv("MCA_SEED");
+        if (env_val != nullptr) {
+          std::string env_str(env_val);
+          rng_seed = std::stoul(env_str);
+        }
+        env_val = getenv("MCA_T");
+        if (env_val != nullptr) {
+          std::string env_str(env_val);
+          t = std::stoi(env_str);
+        }
+        env_val = getenv("MCA_NTRIALS");
+        if (env_val != nullptr) {
+          std::string env_str(env_val);
+          ntrials = std::stoul(env_str);
+        }
+        env_val = getenv("MCA_MODE");
+        if (env_val != nullptr) {
+          std::string env_str(env_val);
+          if (env_str == "RR") { mode = mcalite_mode::RR; }
+          else if (env_str == "PB") { mode = mcalite_mode::PB; }
+          else if (env_str == "FULL") { mode = mcalite_mode::FULL; }
+          else {
+            std::cerr << "Error: invalid MCA_MODE value " << env_str;
+            std::cerr << ", valid MCA_MODE options are RR, PB and FULL.";
+            std::cerr << std::endl;
+            abort();
+          }
+        }
+      }
+      std::string mode_str() {
+        std::string str = "FULL";
+        switch(mode) {
+          case mcalite_mode::RR: str = "RR"; break;
+          case mcalite_mode::PB: str = "PB"; break;
+          default: break; // mcalite_mode::FULL
+        }
+        return str;
+      }
+      void print() {
+        std::cout << "rng_seed = " << rng_seed << ", t = " << t << ", ";
+        std::cout << "ntrials = " << ntrials << ", mode = " << mode_str();
+      }
+      mcalite_context_t(uint64_t rng_stream) {
+        parse_env();
+        results.resize(ntrials);
+        mca_rng_seed(&rng, rng_seed, rng_stream);
+        print(); std::cout << ", rng_stream " << rng_stream << std::endl;
+      }
+    };
+    mcalite_context_t mcalite_context{1};
+  }
+  #define __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(OP, FROM_TY, ...)                 \
+    int __raptor_mca_##OP##_##FROM_TY(__VA_ARGS__)
+  #define __RAPTOR_MCALITE_CALL(OP, MODE, ...)                                 \
+    mca_##OP##_##MODE(__VA_ARGS__, mcalite_context.t, mcalite_context.ntrials, \
+                      &(mcalite_context.rng), mcalite_context.results.data())
+  #define __RAPTOR_MCALITE_OP_FUNC_BODY(OP, ...)                               \
+    {                                                                          \
+      int err = 0;                                                             \
+      switch (mcalite_context.mode) {                                          \
+        case mcalite_mode::RR:                                                 \
+          err = __RAPTOR_MCALITE_CALL(OP, rr, __VA_ARGS__);                    \
+          break;                                                               \
+        case mcalite_mode::PB:                                                 \
+          err = __RAPTOR_MCALITE_CALL(OP, pb, __VA_ARGS__);                    \
+          break;                                                               \
+        case mcalite_mode::FULL:                                               \
+          err = __RAPTOR_MCALITE_CALL(OP, full, __VA_ARGS__);                  \
+          break;                                                               \
+        default: err = -1; break;                                              \
+      }                                                                        \
+      if (err == 0) { result = mcalite_context.results[0]; }                   \
+      else {                                                                   \
+        std::cerr << "Error in mode " << mcalite_context.mode;                 \
+        std::cerr << " with op " << #OP << std::endl;                          \
+      }                                                                        \
+      return err;                                                              \
+    }
+  #define __RAPTOR_MCALITE_BINARY_OP(OP, FROM_TY, CPP_TY)                      \
+    __RAPTOR_MPFR_ATTRIBUTES                                                   \
+    __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(OP, FROM_TY,                            \
+                                       CPP_TY & result, CPP_TY x, CPP_TY y)    \
+    __RAPTOR_MCALITE_OP_FUNC_BODY(OP, x, y)
+  #define __RAPTOR_MCALITE_UNARY_OP(OP, FROM_TY, CPP_TY)                       \
+    __RAPTOR_MPFR_ATTRIBUTES                                                   \
+    __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(OP, FROM_TY, CPP_TY & result, CPP_TY x) \
+    __RAPTOR_MCALITE_OP_FUNC_BODY(OP, x)
+  
+  #define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                   \
+    __RAPTOR_MCALITE_BINARY_OP(add, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_BINARY_OP(sub, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_BINARY_OP(mul, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_BINARY_OP(div, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_UNARY_OP(neg, FROM_TY, CPP_TY)
+  #include "raptor/FloatTypes.def"
+
+  #define __RAPTOR_MCALITE_get_virtual_prec                                    \
+    do { return mcalite_context.t; } while(0)
+
+#else
+  #define __RAPTOR_USE_MCALITE false
+  #define __RAPTOR_MCALITE_get_virtual_prec
+#endif // __RAPTOR_USE_MCALITE
+
 #define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                     \
   __RAPTOR_MPFR_ATTRIBUTES                                                     \
   unsigned int __raptor_mca_get_virtural_prec_##FROM_TY(mpfr_t a,              \
                                                         const char *loc) {     \
     if constexpr (__RAPTOR_USE_VERIFICARLOMCA) {                               \
       __RAPTOR_VERIFICARLOMCA_get_virtual_prec(CPP_TY);                        \
+    } else if constexpr (__RAPTOR_USE_MCALITE) {                               \
+      __RAPTOR_MCALITE_get_virtual_prec;                                       \
     } else {                                                                   \
       std::cerr << "__raptor_mca_get_virtural_prec_" << #FROM_TY;              \
       std::cerr << " is not implemented." << std::endl;                        \

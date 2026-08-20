@@ -370,22 +370,21 @@ install(PROGRAMS
   DESTINATION bin)
 
 if (DEFINED __RAPTOR_VERIFICARLOMCA_LIB_PATH)
-  if (__RAPTOR_VERIFICARLOMCA_LIB_PATH MATCHES "libinterflop_mca.so")
-    string(APPEND CMAKE_CXX_FLAGS " -D__RAPTOR_VERIFICARLOMCA_MODE")
-  elseif (__RAPTOR_VERIFICARLOMCA_LIB_PATH MATCHES "libinterflop_mca_int.so")
-    string(APPEND CMAKE_CXX_FLAGS " -D__RAPTOR_VERIFICARLOMCA_INT_MODE")
-  else()
+  if (NOT (__RAPTOR_VERIFICARLOMCA_LIB_PATH MATCHES "libinterflop_mca.so" OR __RAPTOR_VERIFICARLOMCA_LIB_PATH MATCHES "libinterflop_mca_int.so"))
     message(SEND_ERROR "__RAPTOR_VERIFICARLOMCA_LIB_PATH ${__RAPTOR_VERIFICARLOMCA_LIB_PATH} does not include the expected library name")
-  endif()
-
-  if (NOT EXISTS "${__RAPTOR_VERIFICARLOMCA_LIB_PATH}")
+  elseif (NOT EXISTS "${__RAPTOR_VERIFICARLOMCA_LIB_PATH}")
     message(SEND_ERROR "__RAPTOR_VERIFICARLOMCA_LIB_PATH ${__RAPTOR_VERIFICARLOMCA_LIB_PATH} does not exists")
+  else()
+    add_library(verificarlo SHARED IMPORTED)
+    set_target_properties(verificarlo PROPERTIES
+      IMPORTED_LOCATION "${__RAPTOR_VERIFICARLOMCA_LIB_PATH}"
+    )
+    if (__RAPTOR_VERIFICARLOMCA_LIB_PATH MATCHES "libinterflop_mca.so")
+      target_compile_definitions(verificarlo INTERFACE __RAPTOR_VERIFICARLOMCA_MODE)
+    elseif (__RAPTOR_VERIFICARLOMCA_LIB_PATH MATCHES "libinterflop_mca_int.so")
+      target_compile_definitions(verificarlo INTERFACE __RAPTOR_VERIFICARLOMCA_INT_MODE)
+    endif()
   endif()
-
-  add_library(verificarlo SHARED IMPORTED)
-  set_target_properties(verificarlo PROPERTIES
-    IMPORTED_LOCATION "${__RAPTOR_VERIFICARLOMCA_LIB_PATH}"
-  )
 endif()
 add_subdirectory(runtime)
 add_subdirectory(test)

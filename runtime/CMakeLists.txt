@@ -45,6 +45,10 @@ target_include_directories(Raptor-RT-${LLVM_VERSION_MAJOR} PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 
+if (DEFINED __RAPTOR_VERIFICARLOMCA_LIB_PATH)
+  target_link_libraries(Raptor-RT-${LLVM_VERSION_MAJOR} PRIVATE verificarlo)
+endif()
+
 install(
   DIRECTORY ${RAPTOR_PUBLIC_INCLUDE_DIR}
   DESTINATION include

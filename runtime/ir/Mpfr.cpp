@@ -85,10 +85,10 @@
 #ifndef __RAPTOR_MCA_MODE
   #ifdef __RAPTOR_VERIFICARLOMCA_MODE
     #define __RAPTOR_MCA_MODE
-  #else
-    #ifdef __RAPTOR_VERIFICARLOMCA_INT_MODE
-      #define __RAPTOR_MCA_MODE
-    #endif
+  #elif (defined __RAPTOR_VERIFICARLOMCA_QUAD_MODE)
+    #define __RAPTOR_MCA_MODE
+  #elif (defined __RAPTOR_VERIFICARLOMCA_INT_MODE)
+    #define __RAPTOR_MCA_MODE
   #endif
 #endif
 

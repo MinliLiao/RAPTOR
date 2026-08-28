@@ -45,6 +45,9 @@ static inline bool __raptor_fprt_is_op_mode(int64_t mode) {
 static inline bool __raptor_fprt_is_full_module_op_mode(int64_t mode) {
   return mode & 0b0100;
 }
+static inline bool __raptor_fprt_is_mca_mode(int64_t mode) {
+  return mode & 0b011110000;
+}
 
 __RAPTOR_MPFR_DECL_ATTRIBUTES
 void raptor_fprt_gc_dump_status();

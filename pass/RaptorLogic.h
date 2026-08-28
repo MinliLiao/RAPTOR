@@ -83,10 +83,21 @@ getTypeForWidth(llvm::LLVMContext &ctx, unsigned width, bool builtinFloat) {
   }
 }
 
+namespace MCAType {
+  enum MCAType {
+    NoMCAType,
+    VerificarloMCA,
+    NumMCAType
+  };
+  static constexpr int shift = 4;
+};
+
 enum TruncateMode {
   TruncMemMode = 0b0001,
   TruncOpMode = 0b0010,
   TruncOpFullModuleMode = 0b0110,
+  TruncOpMCAVerificarloMode = TruncOpMode + 
+                              (MCAType::VerificarloMCA << MCAType::shift),
 };
 [[maybe_unused]] static const char *truncateModeStr(TruncateMode mode) {
   switch (mode) {
@@ -96,9 +107,26 @@ enum TruncateMode {
     return "op";
   case TruncOpFullModuleMode:
     return "op_full_module";
+  case TruncOpMCAVerificarloMode:
+    return "op_mca_verificarlo";
   }
   llvm_unreachable("Invalid truncation mode");
 }
+
+namespace MCAType {
+  constexpr bool isMCA(TruncateMode Mode) {
+    return (Mode >> shift) > 0;
+  }
+  constexpr 
+  std::pair<TruncateMode, MCAType> splitTruncMCAMode(TruncateMode Mode) {
+    switch (Mode) {
+      case TruncOpMCAVerificarloMode:
+        return {TruncOpMode, VerificarloMCA}; break;
+      default:
+        return {Mode, NoMCAType}; break;
+    }
+  }
+};
 
 struct FloatRepresentation {
 public:
@@ -423,6 +451,23 @@ public:
                                        "",
                                        false,
                                        Truncation.getTo()};
+    } else if (MCAType::isMCA(Truncation.getMode())) {
+      // toFPRT is required to insert code throug the runtime library
+      assert(Truncation.isToFPRT());
+      auto [truncateMode, mcaType] = 
+        MCAType::splitTruncMCAMode(Truncation.getMode());
+      // Currently only works with op-mode
+      assert(truncateMode == TruncOpMode);
+      return TruncationConfiguration{Truncation.getFrom(), // FromRepr
+                                     Truncation.getMode(), // Mode
+                                     true,                 // NeedNewScratch
+                                     true,                 // NeedTruncChange
+                                     false,                // ScratchFromArgs
+                                     Args,                 // CustomArgs
+                                     Mangle,               // CustomMangle
+                                     "fprt",               // RTName
+                                     true,                 // IsToFPRT
+                                     std::nullopt};        // ToRepr
     } else {
       llvm_unreachable("");
     }

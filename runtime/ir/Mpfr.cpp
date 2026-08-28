@@ -587,11 +587,17 @@ void raptor_fprt_op_clear();
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
       mpfr_set_##MPFR_SET_ARG1(scratch[0], a, ROUNDING_MODE);                  \
       if constexpr (__RAPTOR_USE_MCA) {                                        \
-        __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[0], loc, ROUNDING_MODE, false);\
+        if (__raptor_fprt_is_mca_mode(mode)) {                                 \
+          __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[0], loc, ROUNDING_MODE,      \
+                               false);                                         \
+        }                                                                      \
       }                                                                        \
       mpfr_##MPFR_FUNC_NAME(scratch[2], scratch[0], ROUNDING_MODE);            \
       if constexpr (__RAPTOR_USE_MCA) {                                        \
-        __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[2], loc, ROUNDING_MODE, true); \
+        if (__raptor_fprt_is_mca_mode(mode)) {                                 \
+          __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[2], loc, ROUNDING_MODE,      \
+                               true);                                          \
+        }                                                                      \
       }                                                                        \
       RET c = mpfr_get_##MPFR_GET(scratch[2], ROUNDING_MODE);                  \
       return c;                                                                \
@@ -623,11 +629,17 @@ void raptor_fprt_op_clear();
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
       mpfr_set_##MPFR_SET_ARG1(scratch[0], a, ROUNDING_MODE);                  \
       if constexpr (__RAPTOR_USE_MCA) {                                        \
-        __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[0], loc, ROUNDING_MODE, false);\
+        if (__raptor_fprt_is_mca_mode(mode)) {                                 \
+          __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[0], loc, ROUNDING_MODE,      \
+                               false);                                         \
+        }                                                                      \
       }                                                                        \
       mpfr_##MPFR_FUNC_NAME(scratch[2], scratch[0], b, ROUNDING_MODE);         \
       if constexpr (__RAPTOR_USE_MCA) {                                        \
-        __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[2], loc, ROUNDING_MODE, true); \
+        if (__raptor_fprt_is_mca_mode(mode)) {                                 \
+          __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[2], loc, ROUNDING_MODE,      \
+                               true);                                          \
+        }                                                                      \
       }                                                                        \
       RET c = mpfr_get_##MPFR_GET(scratch[2], ROUNDING_MODE);                  \
       return c;                                                                \
@@ -658,13 +670,20 @@ void raptor_fprt_op_clear();
       mpfr_set_##MPFR_SET_ARG1(scratch[0], a, ROUNDING_MODE);                  \
       mpfr_set_##MPFR_SET_ARG2(scratch[1], b, ROUNDING_MODE);                  \
       if constexpr (__RAPTOR_USE_MCA) {                                        \
-        __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[0], loc, ROUNDING_MODE, false);\
-        __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[1], loc, ROUNDING_MODE, false);\
+        if (__raptor_fprt_is_mca_mode(mode)) {                                 \
+          __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[0], loc, ROUNDING_MODE,      \
+                               false);                                         \
+          __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[1], loc, ROUNDING_MODE,      \
+                               false);                                         \
+        }                                                                      \
       }                                                                        \
       mpfr_##MPFR_FUNC_NAME(scratch[2], scratch[0], scratch[1],                \
                             ROUNDING_MODE);                                    \
       if constexpr (__RAPTOR_USE_MCA) {                                        \
-        __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[2], loc, ROUNDING_MODE, true); \
+        if (__raptor_fprt_is_mca_mode(mode)) {                                 \
+          __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[2], loc, ROUNDING_MODE,      \
+                               true);                                          \
+        }                                                                      \
       }                                                                        \
       RET c = mpfr_get_##MPFR_GET(scratch[2], ROUNDING_MODE);                  \
       return c;                                                                \
@@ -699,14 +718,22 @@ void raptor_fprt_op_clear();
       mpfr_set_##MPFR_TYPE(scratch[1], b, ROUNDING_MODE);                      \
       mpfr_set_##MPFR_TYPE(scratch[2], c, ROUNDING_MODE);                      \
       if constexpr (__RAPTOR_USE_MCA) {                                        \
-        __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[0], loc, ROUNDING_MODE, false);\
-        __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[1], loc, ROUNDING_MODE, false);\
-        __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[2], loc, ROUNDING_MODE, false);\
+        if (__raptor_fprt_is_mca_mode(mode)) {                                 \
+          __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[0], loc, ROUNDING_MODE,      \
+                               false);                                         \
+          __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[1], loc, ROUNDING_MODE,      \
+                               false);                                         \
+          __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[2], loc, ROUNDING_MODE,      \
+                               false);                                         \
+        }                                                                      \
       }                                                                        \
       mpfr_mul(scratch[0], scratch[0], scratch[1], ROUNDING_MODE);             \
       mpfr_add(scratch[0], scratch[0], scratch[2], ROUNDING_MODE);             \
       if constexpr (__RAPTOR_USE_MCA) {                                        \
-        __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[0], loc, ROUNDING_MODE, true); \
+        if (__raptor_fprt_is_mca_mode(mode)) {                                 \
+          __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[0], loc, ROUNDING_MODE,      \
+                               true);                                          \
+        }                                                                      \
       }                                                                        \
       TYPE res = mpfr_get_##MPFR_TYPE(scratch[0], ROUNDING_MODE);              \
       return res;                                                              \
@@ -747,8 +774,12 @@ void raptor_fprt_op_clear();
       mpfr_set_##MPFR_GET(scratch[0], a, ROUNDING_MODE);                       \
       mpfr_set_##MPFR_GET(scratch[1], b, ROUNDING_MODE);                       \
       if constexpr (__RAPTOR_USE_MCA) {                                        \
-        __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[0], loc, ROUNDING_MODE, false);\
-        __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[1], loc, ROUNDING_MODE, false);\
+        if (__raptor_fprt_is_mca_mode(mode)) {                                 \
+          __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[0], loc, ROUNDING_MODE,      \
+                               false);                                         \
+          __RAPTOR_MCA_INEXACT(FROM_TYPE, scratch[1], loc, ROUNDING_MODE,      \
+                               false);                                         \
+        }                                                                      \
       }                                                                        \
       int ret = mpfr_cmp(scratch[0], scratch[1]);                              \
       return ret CMP;                                                          \

@@ -1,4 +1,4 @@
-// RUN: %clang -O3 %s -o %t.a.out %loadClangRaptor %linkRaptorRT %includeRaptorRT -lm && RAPTOR_FLOP_LOG_PREFIX=%t.flop_log %t.a.out && xxd %t.flop_log.double | FileCheck %s
+// RUN: %clang -O3 %s -o %t.a.out %loadClangRaptor %linkRaptorRT %includeRaptorRT -lm && env RAPTOR_FLOP_LOG_PREFIX=%t.flop_log %t.a.out && xxd %t.flop_log.double | FileCheck %s
 
 // CHECK: 00000000: 0000 0000 0000 f03f 0000 0000 0000 0040
 // CHECK: 00000010: 0000 0000 0000 0840 0000 0000 0000 0040

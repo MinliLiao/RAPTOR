@@ -1,4 +1,4 @@
-; RUN: if [ %llvmver -lt 16 ]; then %opt < %s %loadRaptor -raptor -S | FileCheck %s; fi
+; RUN: python3 -c "import sys; sys.exit(1 if (%llvmver < 16) else 0)" || %opt < %s %loadRaptor -raptor -S | FileCheck %s
 ; RUN: %opt < %s %newLoadRaptor -passes="raptor" -S | FileCheck %s
 
 define i1 @f(double %x, double %y) {

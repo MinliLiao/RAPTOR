@@ -82,17 +82,8 @@
   } while (0)
 #endif
 
-#ifndef __RAPTOR_MCA_MODE
-  #ifdef __RAPTOR_VERIFICARLOMCA_MODE
-    #define __RAPTOR_MCA_MODE
-  #elif (defined __RAPTOR_VERIFICARLOMCA_QUAD_MODE)
-    #define __RAPTOR_MCA_MODE
-  #elif (defined __RAPTOR_VERIFICARLOMCA_INT_MODE)
-    #define __RAPTOR_MCA_MODE
-  #endif
-#endif
-
-#ifdef __RAPTOR_MCA_MODE
+#if defined(__RAPTOR_VERIFICARLOMCA_QUAD_MODE) ||                              \
+    defined(__RAPTOR_VERIFICARLOMCA_INT_MODE)
   #define __RAPTOR_USE_MCA true
 
   #define __RAPTOR_MCA_CONCAT(prefix, FROM_TY) __raptor_mca_##prefix##FROM_TY

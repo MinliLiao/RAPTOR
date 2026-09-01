@@ -1,16 +1,9 @@
 #include <iostream>
 #include <type_traits>
 
-#ifndef __RAPTOR_VERIFICARLOMCA_MODE
-  #ifdef __RAPTOR_VERIFICARLOMCA_QUAD_MODE
-    #define __RAPTOR_VERIFICARLOMCA_MODE
-  #elif (defined __RAPTOR_VERIFICARLOMCA_INT_MODE)
-    #define __RAPTOR_VERIFICARLOMCA_MODE
-  #endif
-#endif
-
 // verificarlo uses _Float128 that needs extra definition
-#ifdef __RAPTOR_VERIFICARLOMCA_MODE
+#if defined(__RAPTOR_VERIFICARLOMCA_QUAD_MODE) ||                              \
+    defined(__RAPTOR_VERIFICARLOMCA_INT_MODE)
   // Clang has "unknown type name" error for _Float128 on x86
   #if defined(__clang__) && (defined(__i386) || defined(__x86_64))
     #define _Float128 __float128
@@ -21,7 +14,8 @@
 // mpfr.h is included in Common.h
 #include <raptor/Common.h>
 
-#ifdef __RAPTOR_VERIFICARLOMCA_MODE
+#if defined(__RAPTOR_VERIFICARLOMCA_QUAD_MODE) ||                              \
+    defined(__RAPTOR_VERIFICARLOMCA_INT_MODE)
   #define __RAPTOR_USE_VERIFICARLOMCA true
   // Includes needed to define interface to verificarlo
   #include <argp.h>
@@ -518,9 +512,11 @@
   #define __RAPTOR_VERIFICARLOMCA_get_virtual_prec(CPP_TY)
   #define __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode,   \
                                           isOutbound)
-#endif // __RAPTOR_VERIFICARLOMCA_MODE
+#endif // defined(__RAPTOR_VERIFICARLOMCA_QUAD_MODE) ||
+       // defined(__RAPTOR_VERIFICARLOMCA_INT_MODE)
 
 #define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                     \
+  __RAPTOR_MPFR_ATTRIBUTES                                                     \
   unsigned int __raptor_mca_get_virtural_prec_##FROM_TY(mpfr_t a,              \
                                                         const char *loc) {     \
     if constexpr (__RAPTOR_USE_VERIFICARLOMCA) {                               \
@@ -531,6 +527,7 @@
       abort();                                                                 \
     }                                                                          \
   }                                                                            \
+  __RAPTOR_MPFR_ATTRIBUTES                                                     \
   void __raptor_mca_inexact_##FROM_TY(mpfr_t a, unsigned int virtual_prec,     \
                                       mpfr_rnd_t rnd_mode, bool isOutbound) {  \
     if constexpr (__RAPTOR_USE_VERIFICARLOMCA) {                               \

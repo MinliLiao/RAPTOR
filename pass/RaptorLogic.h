@@ -114,9 +114,11 @@ enum TruncateMode {
 }
 
 namespace MCAType {
+  // Check if a TruncateMode has an MCATYpe added
   constexpr bool isMCA(TruncateMode Mode) {
     return (Mode >> shift) > 0;
   }
+  // Split out the MCAType from the TruncateMode
   constexpr 
   std::pair<TruncateMode, MCAType> splitTruncMCAMode(TruncateMode Mode) {
     switch (Mode) {
@@ -124,6 +126,39 @@ namespace MCAType {
         return {TruncOpMode, VerificarloMCA}; break;
       default:
         return {Mode, NoMCAType}; break;
+    }
+  }
+  // Get MCAType from int input
+  constexpr MCAType get(int mcaType) {
+    switch(mcaType) {
+#ifdef __RAPTOR_HAS_VERIFICARLOMCA
+      case VerificarloMCA: return VerificarloMCA; break;
+#endif
+      default: return NoMCAType; break;
+    }
+  }
+  // Get name of MCAType from int input
+  constexpr std::string_view getName(int mcaType) {
+    switch(mcaType) {
+      case NoMCAType: return ""; break;
+      case VerificarloMCA: return "verificarlo"; break;
+      default: return "invalid"; break;
+    }
+  }
+  // Add mcaType to TruncateMode
+  constexpr TruncateMode addToTruncateMode(TruncateMode Mode, 
+                                           MCAType mcaType) {
+    assert(!isMCA(Mode));
+    return TruncateMode(Mode + (mcaType << shift));
+  }
+  // Check that the TruncateMode and mcaType combo is supported
+  constexpr bool isValidTruncMCAMode(TruncateMode Mode, MCAType mcaType) {
+    assert(!isMCA(Mode));
+    switch (Mode + (mcaType << shift)) {
+      case TruncOpMCAVerificarloMode:
+        return true; break;
+      default:
+        return false; break;
     }
   }
 };

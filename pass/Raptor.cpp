@@ -127,32 +127,6 @@ void addNoCapture(llvm::Function *F, unsigned ArgNo) {
 #endif
 }
 
-namespace MCAType {
-  // Get MCAType from int input
-  constexpr MCAType get(int mcaType) {
-    switch(mcaType) {
-      case VerificarloMCA: return VerificarloMCA; break;
-      default: return NoMCAType; break;
-    }
-  }
-  // Add mcaType to TruncateMode
-  constexpr TruncateMode addToTruncateMode(TruncateMode Mode, 
-                                           MCAType mcaType) {
-    assert(!isMCA(Mode));
-    return TruncateMode(Mode + (mcaType << shift));
-  }
-  // Check that the TruncateMode and mcaType combo is supported
-  constexpr bool isValidTruncMCAMode(TruncateMode Mode, MCAType mcaType) {
-    assert(!isMCA(Mode));
-    switch (Mode + (mcaType << shift)) {
-      case TruncOpMCAVerificarloMode:
-        return true; break;
-      default:
-        return false; break;
-    }
-  }
-};
-
 #define addAttribute addAttributeAtIndex
 #define getAttribute getAttributeAtIndex
 bool attributeKnownFunctions(llvm::Function &F) {
@@ -687,16 +661,18 @@ public:
       return false;
     }
     auto Cmca = cast<ConstantInt>(CI->getArgOperand(1));
-    if (Cmca->getValue().getZExtValue()+1 >= MCAType::NumMCAType) {
+    auto mcaTypeID = Cmca->getValue().getZExtValue();
+    if (mcaTypeID + 1 >= MCAType::NumMCAType) {
       EmitFailure("WrongArgVal", CI->getDebugLoc(), CI,
                   "Invalid input for MCA backend type.");
       return false;
     }
-    MCAType::MCAType mcaType = MCAType::get(Cmca->getValue().getZExtValue()+1);
+    MCAType::MCAType mcaType = MCAType::get(mcaTypeID + 1);
+    auto mcaName = MCAType::getName(mcaTypeID + 1); 
     if (mcaType == MCAType::NoMCAType) {
       EmitFailure("Unsupported", CI->getDebugLoc(), CI,
-                  "Unsupported MCA backend type ", mcaType,
-                  ", please build raptor with selected backend type.");
+                  "Unsupported MCA backend type ", mcaTypeID, "(", mcaName,
+                  "), please build raptor with selected backend type.");
       return false;
     }
     if (!isValidTruncMCAMode(TruncOpMode, mcaType)) {

@@ -390,16 +390,20 @@ if (DEFINED __RAPTOR_VERIFICARLOMCA_LIB_PATH)
     endif()
   endforeach()
   if (DEFINED __RAPTOR_VERIFICARLOMCA_QUAD_LIB_PATH) 
+    get_filename_component(__RAPTOR_VERIFICARLOMCA_QUAD_LIB_DIR "${__RAPTOR_VERIFICARLOMCA_QUAD_LIB_PATH}" DIRECTORY)
     add_library(verificarlo SHARED IMPORTED)
     set_target_properties(verificarlo PROPERTIES
       IMPORTED_LOCATION "${__RAPTOR_VERIFICARLOMCA_QUAD_LIB_PATH}"
+      INTERFACE_INCLUDE_DIRECTORIES "${__RAPTOR_VERIFICARLOMCA_QUAD_LIB_DIR}/../include"
     )
     target_compile_definitions(verificarlo INTERFACE __RAPTOR_VERIFICARLOMCA_QUAD_MODE)
   endif()
   if (DEFINED __RAPTOR_VERIFICARLOMCA_INT_LIB_PATH)
+    get_filename_component(__RAPTOR_VERIFICARLOMCA_INT_LIB_DIR "${__RAPTOR_VERIFICARLOMCA_INT_LIB_PATH}" DIRECTORY)
     add_library(verificarlo_int SHARED IMPORTED)
     set_target_properties(verificarlo_int PROPERTIES
       IMPORTED_LOCATION "${__RAPTOR_VERIFICARLOMCA_INT_LIB_PATH}"
+      INTERFACE_INCLUDE_DIRECTORIES "${__RAPTOR_VERIFICARLOMCA_QUAD_LIB_DIR}/../include"
     )
     target_compile_definitions(verificarlo_int INTERFACE __RAPTOR_VERIFICARLOMCA_INT_MODE)
   endif()

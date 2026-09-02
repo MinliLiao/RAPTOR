@@ -20,37 +20,15 @@
   // Includes needed to define interface to verificarlo
   #include <argp.h>
   #include <err.h>
-  #include <stdlib.h>
-  #include <stdio.h>
-  #include <string.h>
-  #include <strings.h>
   #include <sys/syscall.h>
   #include <sys/time.h>
-  #include <sys/types.h> 
   #include <unistd.h>
   #if defined(__cplusplus)
   extern "C" {
   #endif
-  // Typedefs copied from verificarlo repo file
-  // src/interflop-stdlib/interflop_stdlib.h
-  typedef void (*interflop_panic_t)(const char *msg);
-  typedef void File;
-  // Function signature copied from verificarlo repo file
-  // src/interflop-stdlib/interflop_stdlib.c
-  extern void interflop_set_handler(const char *name, void *function_ptr);
   #ifdef __RAPTOR_VERIFICARLOMCA_INT_MODE
     #define __RAPTOR_VERIFICARLOMCA_HAS_INT true
-    // Macro copied from verificarlo repo backends files
-    // src/backends/interflop-backend-mcaint/interflop_mca.h
-    #define INTERFLOP_MCAINT_API(name) interflop_mcaint_##name
-    // Function signatures copied from verificarlo repo backends files
-    // src/backends/interflop-backend-mcaint/interflop_mca.c
-    extern void INTERFLOP_MCAINT_API(pre_init)(interflop_panic_t panic, 
-                                               File *stream, void **context);
-    extern void INTERFLOP_MCAINT_API(cli)(int argc, char **argv, 
-                                          void *context);
-    extern void INTERFLOP_MCAINT_API(configure)(void *configure, 
-                                                void *context);
+    #include <interflop/interflop_mca_int.h>
     extern void _mcaint_inexact_binary64(double *da, void *context);
     extern void _mcaint_inexact_binary128(_Float128 *qa, void *context);
     #define __RAPTOR_VERIFICARLOMCA_INT_INTERFLOP_CALL(name, ...) \
@@ -64,17 +42,7 @@
   #endif
   #ifdef __RAPTOR_VERIFICARLOMCA_QUAD_MODE
     #define __RAPTOR_VERIFICARLOMCA_HAS_QUAD true
-    // Macro copied from verificarlo repo backends files
-    // src/backends/interflop-backend-mcaint/interflop_mca_int.h
-    #define INTERFLOP_MCAQUAD_API(name) interflop_mcaquad_##name
-    // Function signatures copied from verificarlo repo backends files
-    // src/backends/interflop-backend-mcaint/interflop_mca_int.c
-    extern void INTERFLOP_MCAQUAD_API(pre_init)(interflop_panic_t panic, 
-                                                File *stream, void **context);
-    extern void INTERFLOP_MCAQUAD_API(cli)(int argc, char **argv, 
-                                           void *context);
-    extern void INTERFLOP_MCAQUAD_API(configure)(void *configure, 
-                                                 void *context);
+    #include <interflop/interflop_mca.h>
     extern void _mcaquad_inexact_binary64(double *da, void *context);
     extern void _mcaquad_inexact_binary128(_Float128 *qa, void *context);
     #define __RAPTOR_VERIFICARLOMCA_INTERFLOP_CALL(name, ...) \
@@ -89,84 +57,38 @@
   #if defined(__cplusplus)
   }
   #endif
+  #if __RAPTOR_VERIFICARLOMCA_HAS_INT && __RAPTOR_VERIFICARLOMCA_HAS_QUAD
+    #define __RAPTOR_VERIFICARLO_MCA_TYPE(name)                                \
+      std::conditional_t<IS_MCAINT, mcaint_##name, mcaquad_##name>
+    #define __RAPTOR_VERIFICARLO_MCA_ENUM(type, name)                          \
+      mca_##type<IS_MCAINT>(IS_MCAINT? mcaint_##type::mcaint_##name :          \
+                                       mcaquad_##type::mcaquad_##name)
+  #elif __RAPTOR_VERIFICARLOMCA_HAS_INT
+    #define __RAPTOR_VERIFICARLO_MCA_TYPE(name) mcaint_##name
+    #define __RAPTOR_VERIFICARLO_MCA_ENUM(type, name)                          \
+      mcaint_##type::mcaint_##name
+  #else // __RAPTOR_VERIFICARLOMCA_HAS_QUAD
+    #define __RAPTOR_VERIFICARLO_MCA_TYPE(name) mcaquad_##name
+    #define __RAPTOR_VERIFICARLO_MCA_ENUM(type, name)                          \
+      mcaquad_##type::mcaquad_##name
+  #endif
   
   // Enclose types/functions to interface with verificarlo in unnamed namespace
   namespace {
     // Using a struct because the context needs initialization
     struct verificarlo_mca_context_t {
-      // Typedef copied from verificarlo repo file
-      // src/interflop-stdlib/interflop_stdlib.h
-      typedef unsigned int IUint32_t;
-      typedef long int IInt64_t;
-      typedef unsigned long int IUint64_t;
-      typedef int IBool;
-
-      // Definitions adapted from verificarlo repo backends files
-      // src/backends/interflop-backend-mcaint/interflop_mca_int.h and
-      // src/backends/interflop-backend-mcaquad/interflop_mca.h
-      // These definitions from mcaint and mcaquad are compatible so defining
-      // only once here.
-      /* define the available MCA modes of operation */
-      typedef enum {
-        mca_mode_ieee,
-        mca_mode_mca,
-        mca_mode_pb,
-        mca_mode_rr,
-        _mca_mode_end_
-      } mca_mode;
-
-      /* define the available error modes */
-      typedef enum {
-        mca_err_mode_rel,
-        mca_err_mode_abs,
-        mca_err_mode_all,
-        _mca_err_mode_end_
-      } mca_err_mode;
-
-      /* Interflop context */
-      typedef struct {
-        IUint64_t seed;
-        float sparsity;
-        int binary32_precision;
-        int binary64_precision;
-        int absErr_exp;
-        IBool relErr;
-        IBool absErr;
-        IBool daz;
-        IBool ftz;
-        IBool choose_seed;
-        mca_mode mode;
-      } mcaquad_context_t;
-
-      /* Interflop context */
-      typedef struct {
-        IBool relErr;
-        IBool absErr;
-        IBool daz;
-        IBool ftz;
-        IBool choose_seed;
-        mca_mode mode;
-        int binary32_precision;
-        int binary64_precision;
-        int absErr_exp;
-        float sparsity;
-        IUint64_t seed;
-      } mcaint_context_t;
-
+      // Helper type for getting the correct mca context type
       template<bool IS_MCAINT>
-      using mca_context_t = std::conditional_t<IS_MCAINT, mcaint_context_t, 
-                                                          mcaquad_context_t>;
-      typedef struct {
-        IUint64_t seed;
-        float sparsity; 
-        IUint32_t precision_binary32;
-        IUint32_t precision_binary64;
-        mca_mode mode;
-        mca_err_mode err_mode;
-        IInt64_t max_abs_err_exponent;
-        IUint32_t daz;
-        IUint32_t ftz;
-      } mca_conf_t;
+      using mca_context_t = __RAPTOR_VERIFICARLO_MCA_TYPE(context_t);
+      // Helper type for getting the correct mca configure type
+      template<bool IS_MCAINT>
+      using mca_conf_t = __RAPTOR_VERIFICARLO_MCA_TYPE(conf_t);
+      // Helper type for getting the correct mca mode type
+      template<bool IS_MCAINT>
+      using mca_mode = __RAPTOR_VERIFICARLO_MCA_TYPE(mode);
+      // Helper type for getting the correct mca error mode type
+      template<bool IS_MCAINT>
+      using mca_err_mode = __RAPTOR_VERIFICARLO_MCA_TYPE(err_mode);
 
       // Helper type for compile time type check
       template<typename T>
@@ -185,8 +107,53 @@
       template<typename T, is_float_or_double_t<T> = true>
       using inexact_t = std::conditional_t<std::is_same_v<T, float>, double, 
                                                                     _Float128>;
-
       
+      // Helper variable template to get the correct mca mode enum value
+      template<bool IS_MCAINT>
+      static constexpr mca_mode<IS_MCAINT> mca_mode_ieee = 
+        __RAPTOR_VERIFICARLO_MCA_ENUM(mode, mode_ieee);
+      template<bool IS_MCAINT>
+      static constexpr mca_mode<IS_MCAINT> mca_mode_rr = 
+        __RAPTOR_VERIFICARLO_MCA_ENUM(mode, mode_rr);
+      template<bool IS_MCAINT>
+      static constexpr mca_mode<IS_MCAINT> mca_mode_pb = 
+        __RAPTOR_VERIFICARLO_MCA_ENUM(mode, mode_pb);
+      template<bool IS_MCAINT>
+      static constexpr mca_mode<IS_MCAINT> mca_mode_mca = 
+        __RAPTOR_VERIFICARLO_MCA_ENUM(mode, mode_mca);
+      
+      // Helper variable template to get the correct mca error mode enum value
+      template<bool IS_MCAINT>
+      static constexpr mca_err_mode<IS_MCAINT> mca_err_mode_rel = 
+        __RAPTOR_VERIFICARLO_MCA_ENUM(err_mode, err_mode_rel);
+      template<bool IS_MCAINT>
+      static constexpr mca_err_mode<IS_MCAINT> mca_err_mode_abs = 
+        __RAPTOR_VERIFICARLO_MCA_ENUM(err_mode, err_mode_abs);
+      template<bool IS_MCAINT>
+      static constexpr mca_err_mode<IS_MCAINT> mca_err_mode_all = 
+        __RAPTOR_VERIFICARLO_MCA_ENUM(err_mode, err_mode_all);
+
+      // Helper variable template to get mca_conf_t with default values
+      template<bool IS_MCAINT>
+      static constexpr mca_conf_t<IS_MCAINT> default_mca_conf = {
+        .seed = 0ULL, // Default to 0, but always sets the seed to chosen
+        // If random (0,1) num > sparsity, MCA is not applied.
+        .sparsity = 1.0f, // Always apply MCA
+        // Between 1 and double precision pseudo-mantissa encoding size (52)
+        .precision_binary32 = 24, // default to float mantissa size (23+1)
+        // Between 1 and quad precision pseudo mantissa encoding size (112)
+        .precision_binary64 = 53, // default to double mantissa size (52+1)
+        // Only add inexact to input operands.
+        .mode = mca_mode_pb<IS_MCAINT>, // default to only perturb inbound
+        // The mode matching formula (1) in Verificarlo
+        .err_mode = mca_err_mode_rel<IS_MCAINT>,
+        // Unused for relative error mode mca_err_mode_rel
+        .max_abs_err_exponent = 112, // default from verificarlo set to 112
+        // Default to false, not dealing with this now 
+        .daz = 0, // 0 for false, 1 for true
+        .ftz = 0 // 0 for false, 1 for true
+      };
+
       // Function and definition adapted from verificarlo repo file 
       // src/vfcwrapper/main.c.in
       static constexpr int MAX_ARGS=256;
@@ -207,7 +174,7 @@
           argv[argc] = NULL;
         }
       }
-      // Return the high precision type used for MCA calculation from mpfr_t a, 
+      // Return the high precision type used for MCA calculation from mpfr_t a,
       // with the rounding mode rnd_mode
       template<typename T, is_float_t<T> = true>
       static inexact_t<T> get_inexact_t_from(mpfr_t a, mpfr_rnd_t rnd_mode) {
@@ -269,9 +236,17 @@
         else { return _get_virtual_prec<T, false>(); }
       }
       // Returns the MCA mode (ieee, rr, pb, or mca)
-      mca_mode get_mode() {
-        if (is_mcaint) { return ((mca_context_t<true> *)context)->mode; }
-        else { return ((mca_context_t<false> *)context)->mode; }
+      template<bool IS_MCAINT>
+      mca_mode<IS_MCAINT> get_mode() {
+        return ((mca_context_t<IS_MCAINT> *)context)->mode;
+      }
+      // Returns if MCA random perturbation should be added based on mode
+      template<bool IS_MCAINT>
+      bool should_inexact(bool isOutbound) {
+        auto mode = get_mode<IS_MCAINT>();
+        return isOutbound ?
+          (mode == mca_mode_rr<IS_MCAINT> || mode == mca_mode_mca<IS_MCAINT>) :
+          (mode == mca_mode_pb<IS_MCAINT> || mode == mca_mode_mca<IS_MCAINT>);
       }
       // Set the virtual precision used for MCA of floating point type T
       template<typename T, is_float_or_double_t<T> = true>
@@ -315,7 +290,7 @@
     #endif
     // Function definitions copied from verificarlo repo file
     // src/vfcwrapper/main.c.in
-    void _vfc_panic(const char *msg) { fprintf(stderr, "%s", msg); exit(1);}
+    void _vfc_panic(const char *msg) { fprintf(stderr, "%s", msg); exit(1); }
     pid_t get_tid() { return syscall(__NR_gettid); }
     long _vfc_strtol(const char *nptr, char **endptr, int *error) {
       *error = 0;
@@ -357,7 +332,8 @@
         size_t env_len = strlen(env_val);
         *vfc_backends = (char *)malloc(env_len + 1);
         if (*vfc_backends == NULL) {
-          fprintf(stderr, "Memory allocation failed for %s", *vfc_backends_env);
+          fprintf(stderr, "Memory allocation failed for %s", 
+                          *vfc_backends_env);
         }
         strcpy(*vfc_backends, env_val);
       } else {
@@ -455,25 +431,13 @@
       } else {
         // Default configuration used to initialize the context
         // Also used to set the context when configuration changes
-        mca_conf_t mca_conf = {
-          .seed = 0ULL, // Default to 0, but always sets the seed to chosen
-          // If random (0,1) num > sparsity, MCA is not applied.
-          .sparsity = 1.0f, // Always apply MCA
-          // Between 1 and double precision pseudo-mantissa encoding size (52)
-          .precision_binary32 = 24, // default to float mantissa size (23+1)
-          // Between 1 and quad precision pseudo mantissa encoding size (112)
-          .precision_binary64 = 53, // default to double mantissa size (52+1)
-          // Only add inexact to input operands.
-          .mode = mca_mode::mca_mode_pb, // default to only perturb inbound
-          // The mode matching formula (1) in Verificarlo
-          .err_mode = mca_err_mode::mca_err_mode_rel,
-          // Unused for relative error mode mca_err_mode_rel
-          .max_abs_err_exponent = 112, // default from verificarlo set to 112
-          // Default to false, not dealing with this now 
-          .daz = 0, // 0 for false, 1 for true
-          .ftz = 0 // 0 for false, 1 for true
-        };
-        set_verificarlo_mca_context(&mca_conf);
+        if (is_mcaint) {
+          mca_conf_t<true> mca_conf = default_mca_conf<true>;
+          set_verificarlo_mca_context(&mca_conf);
+        } else {
+          mca_conf_t<false> mca_conf = default_mca_conf<false>;
+          set_verificarlo_mca_context(&mca_conf);
+        }
       }
     }
     // Global so that it gets automatically initialized through construction
@@ -489,11 +453,9 @@
   #define __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode,   \
     isOutbound)                                                                \
     do {                                                                       \
-      using mca_mode = verificarlo_mca_context_t::mca_mode;                    \
-      mca_mode mode = verificarlo_mca_context.get_mode();                      \
-      bool addInexact = isOutbound ?                                           \
-        (mode == mca_mode::mca_mode_rr || mode == mca_mode::mca_mode_mca)      \
-        : (mode == mca_mode::mca_mode_pb || mode == mca_mode::mca_mode_mca);   \
+      bool addInexact = verificarlo_mca_context.is_mcaint?                     \
+        verificarlo_mca_context.should_inexact<true>(isOutbound) :             \
+        verificarlo_mca_context.should_inexact<false>(isOutbound);             \
       if (addInexact) {                                                        \
         if (virtual_prec !=                                                    \
             verificarlo_mca_context.get_virtual_prec<CPP_TY>()                 \

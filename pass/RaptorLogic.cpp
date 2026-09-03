@@ -439,7 +439,8 @@ public:
       }
     };
     if (TC.isToFPRT()) {
-      if (Mode == TruncOpMode || Mode == TruncOpMCAVerificarloMode) {
+      if (Mode == TruncOpMode || Mode == TruncOpMCAVerificarloMode || 
+          Mode == TruncOpMCAMCAliteMode) {
         if (TC.NeedTruncChange || TC.NeedNewScratch)
           AllocScratch();
         if (!TC.NeedNewScratch) {
@@ -471,6 +472,7 @@ public:
     case TruncOpMode:
     case TruncOpFullModuleMode:
     case TruncOpMCAVerificarloMode:
+    case TruncOpMCAMCAliteMode:
       EmitWarning(
           "UnhandledTrunc", I,
           "Operation not handled - it will be executed in the original way.",
@@ -502,6 +504,7 @@ public:
     case TruncOpMode:
     case TruncOpFullModuleMode:
     case TruncOpMCAVerificarloMode:
+    case TruncOpMCAMCAliteMode:
       return floatValTruncate(B, v, TC);
     }
     llvm_unreachable("Unknown trunc mode");
@@ -514,6 +517,7 @@ public:
     case TruncOpMode:
     case TruncOpFullModuleMode:
     case TruncOpMCAVerificarloMode:
+    case TruncOpMCAMCAliteMode:
       return floatValExpand(B, v, TC);
     }
     llvm_unreachable("Unknown trunc mode");
@@ -576,6 +580,7 @@ public:
     case TruncOpMode:
     case TruncOpFullModuleMode:
     case TruncOpMCAVerificarloMode:
+    case TruncOpMCAMCAliteMode:
       return;
     }
   }
@@ -620,6 +625,7 @@ public:
     case TruncOpMode:
     case TruncOpFullModuleMode:
     case TruncOpMCAVerificarloMode:
+    case TruncOpMCAMCAliteMode:
       return;
     }
   }
@@ -643,6 +649,7 @@ public:
     case TruncOpMode:
     case TruncOpFullModuleMode:
     case TruncOpMCAVerificarloMode:
+    case TruncOpMCAMCAliteMode:
       return;
     }
     llvm_unreachable("");
@@ -783,6 +790,7 @@ public:
     case TruncOpMode:
     case TruncOpFullModuleMode:
     case TruncOpMCAVerificarloMode:
+    case TruncOpMCAMCAliteMode:
       break;
     default:
       llvm_unreachable("Unknown trunc mode");
@@ -816,6 +824,7 @@ public:
     case TruncOpMode:
     case TruncOpFullModuleMode:
     case TruncOpMCAVerificarloMode:
+    case TruncOpMCAMCAliteMode:
       break;
     default:
       llvm_unreachable("Unknown trunc mode");
@@ -865,6 +874,7 @@ public:
         case TruncMemMode:
         case TruncOpMode:
         case TruncOpMCAVerificarloMode:
+        case TruncOpMCAMCAliteMode:
           EmitWarning("FPNoFollow", CI,
                       "Will not follow FP through this indirect call.", CI);
           break;
@@ -883,6 +893,7 @@ public:
           break;
         case TruncOpMode:
         case TruncOpMCAVerificarloMode:
+        case TruncOpMCAMCAliteMode:
           EmitWarning("FPNoFollow", CI,
                       "Will not truncate flops in this function call as the "
                       "definition is not available.",
@@ -933,14 +944,15 @@ public:
     IRBuilder<> BuilderZ(newCall);
 
     if (Mode != TruncOpMode && Mode != TruncMemMode && 
-        Mode != TruncOpMCAVerificarloMode)
+        Mode != TruncOpMCAVerificarloMode && Mode != TruncOpMCAMCAliteMode)
       return;
 
     RequestContext ctx(&CI, &BuilderZ);
     auto FTTs = getFunctionToTruncate(CI);
     auto NeedDirectCall = [&](auto FTT) {
       return scratch && (Mode == TruncOpMode || 
-                         Mode == TruncOpMCAVerificarloMode) && 
+                         Mode == TruncOpMCAVerificarloMode ||
+                         Mode == TruncOpMCAMCAliteMode) && 
              isa<CallInst>(&CI) &&
              !FTT.isCallbackFunc();
     };
@@ -1010,6 +1022,7 @@ public:
     case TruncOpMode:
     case TruncOpFullModuleMode:
     case TruncOpMCAVerificarloMode:
+    case TruncOpMCAMCAliteMode:
       break;
     default:
       llvm_unreachable("Unknown trunc mode");

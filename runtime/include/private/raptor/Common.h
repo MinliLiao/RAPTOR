@@ -36,6 +36,17 @@ typedef struct __raptor_fp {
   // #endif
 } __raptor_fp;
 
+// Should match definition in pass/RaptorLogic.h
+namespace MCAType {
+  enum MCAType {
+    NoMCAType,
+    VerificarloMCA,
+    MCAlite,
+    NumMCAType
+  };
+  static constexpr int shift = 4;
+};
+
 static inline bool __raptor_fprt_is_mem_mode(int64_t mode) {
   return mode & 0b0001;
 }
@@ -47,6 +58,11 @@ static inline bool __raptor_fprt_is_full_module_op_mode(int64_t mode) {
 }
 static inline bool __raptor_fprt_is_mca_mode(int64_t mode) {
   return mode & 0b011110000;
+}
+static inline bool __raptor_fprt_mca_type_is(int64_t mode, 
+                                             MCAType::MCAType mcaType)
+{
+  return (mode & 0b011110000) == (mcaType << MCAType::shift);
 }
 
 __RAPTOR_MPFR_DECL_ATTRIBUTES

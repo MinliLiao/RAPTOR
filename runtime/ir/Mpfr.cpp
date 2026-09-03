@@ -616,8 +616,10 @@ void raptor_fprt_op_clear();
       const char *loc, mpfr_t *scratch) {                                      \
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
-        __RAPTOR_MCA_BYPASS_MPFR_FUNC(get_si, OP_TYPE, LLVM_OP_NAME,,          \
-                                      FROM_TYPE, RET, a);                      \
+        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {   \
+          __RAPTOR_MCA_BYPASS_MPFR_FUNC(get_si, OP_TYPE, LLVM_OP_NAME,,        \
+                                        FROM_TYPE, RET, a);                    \
+        }                                                                      \
       }                                                                        \
       mpfr_set_##MPFR_SET_ARG1(scratch[0], a, ROUNDING_MODE);                  \
       RET c = mpfr_get_si(scratch[0], ROUNDING_MODE);                          \
@@ -640,8 +642,10 @@ void raptor_fprt_op_clear();
       const char *loc, mpfr_t *scratch) {                                      \
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
-        __RAPTOR_MCA_BYPASS_MPFR_FUNC(MPFR_FUNC_NAME, OP_TYPE, LLVM_OP_NAME,,  \
-                                      FROM_TYPE, RET, a);                      \
+        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {   \
+          __RAPTOR_MCA_BYPASS_MPFR_FUNC(MPFR_FUNC_NAME, OP_TYPE, LLVM_OP_NAME,,\
+                                        FROM_TYPE, RET, a);                    \
+        }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
       mpfr_set_##MPFR_SET_ARG1(scratch[0], a, ROUNDING_MODE);                  \
@@ -690,8 +694,10 @@ void raptor_fprt_op_clear();
       const char *loc, mpfr_t *scratch) {                                      \
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
-        __RAPTOR_MCA_BYPASS_MPFR_FUNC(MPFR_FUNC_NAME, OP_TYPE, LLVM_OP_NAME,,  \
-                                      FROM_TYPE, RET, a, b);                   \
+        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {   \
+          __RAPTOR_MCA_BYPASS_MPFR_FUNC(MPFR_FUNC_NAME, OP_TYPE, LLVM_OP_NAME,,\
+                                        FROM_TYPE, RET, a, b);                 \
+        }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
       mpfr_set_##MPFR_SET_ARG1(scratch[0], a, ROUNDING_MODE);                  \
@@ -738,8 +744,10 @@ void raptor_fprt_op_clear();
       const char *loc, mpfr_t *scratch) {                                      \
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
-        __RAPTOR_MCA_BYPASS_MPFR_FUNC(MPFR_FUNC_NAME, OP_TYPE, LLVM_OP_NAME,,  \
-                                      FROM_TYPE, RET, a, b);                   \
+        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {   \
+          __RAPTOR_MCA_BYPASS_MPFR_FUNC(MPFR_FUNC_NAME, OP_TYPE, LLVM_OP_NAME,,\
+                                        FROM_TYPE, RET, a, b);                 \
+        }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
       mpfr_set_##MPFR_SET_ARG1(scratch[0], a, ROUNDING_MODE);                  \
@@ -793,8 +801,10 @@ void raptor_fprt_op_clear();
       int64_t mode, const char *loc, mpfr_t *scratch) {                        \
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
-        __RAPTOR_MCA_BYPASS_MPFR_FUNC(fma, OP_TYPE, LLVM_OP_NAME, LLVM_TYPE,   \
-                                      FROM_TYPE, TYPE, a, b, c);               \
+        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {   \
+          __RAPTOR_MCA_BYPASS_MPFR_FUNC(fma, OP_TYPE, LLVM_OP_NAME, LLVM_TYPE, \
+                                        FROM_TYPE, TYPE, a, b, c);             \
+        }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
       mpfr_set_##MPFR_TYPE(scratch[0], a, ROUNDING_MODE);                      \
@@ -857,7 +867,10 @@ void raptor_fprt_op_clear();
       const char *loc, mpfr_t *scratch) {                                      \
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
-        __RAPTOR_MCA_BYPASS_MPFR_FUNC(cmp, fcmp, NAME,, FROM_TYPE, bool, a, b);\
+        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {   \
+          __RAPTOR_MCA_BYPASS_MPFR_FUNC(cmp, fcmp, NAME,, FROM_TYPE, bool, a,  \
+                                        b);                                    \
+        }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
       mpfr_set_##MPFR_GET(scratch[0], a, ROUNDING_MODE);                       \

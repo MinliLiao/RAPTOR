@@ -687,6 +687,17 @@ public:
       return;
     }
 
+    if (Mode == TruncOpMCAMCAliteMode) {
+      // MCAlite only performs fadd, fsub, fmul and fdiv binary operations
+      switch (BO.getOpcode()) {
+        case BinaryOperator::FAdd:
+        case BinaryOperator::FSub:
+        case BinaryOperator::FMul:
+        case BinaryOperator::FDiv:
+          break;
+        default: return; break;
+      }
+    }
     auto newI = getNewFromOriginal(&BO);
     IRBuilder<> B(newI);
     auto newLHS = truncate(B, getNewFromOriginal(oldLHS));
@@ -726,6 +737,9 @@ public:
   bool handleIntrinsic(llvm::CallBase &CI, Intrinsic::ID ID) {
     if (isDbgInfoIntrinsic(ID))
       return true;
+    
+    // MCAlite do not support intrinsics
+    if (Mode == TruncOpMCAMCAliteMode) { return true; }
 
     auto newI = cast<llvm::CallBase>(getNewFromOriginal(&CI));
     IRBuilder<> B(newI);

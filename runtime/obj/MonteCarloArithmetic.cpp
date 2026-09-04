@@ -547,8 +547,8 @@
     };
     mcalite_context_t mcalite_context{1};
   }
-  #define __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(OP, FROM_TY, ...)                 \
-    int __raptor_mca_##OP##_##FROM_TY(__VA_ARGS__)
+  #define __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(CPP_TY, OP, FROM_TY, ...)         \
+    CPP_TY __raptor_mca_##OP##_##FROM_TY(__VA_ARGS__)
   #define __RAPTOR_MCALITE_CALL(OP, MODE, ...)                                 \
     mca_##OP##_##MODE(__VA_ARGS__, mcalite_context.t, mcalite_context.ntrials, \
                       &(mcalite_context.rng), mcalite_context.results.data())
@@ -567,21 +567,20 @@
           break;                                                               \
         default: err = -1; break;                                              \
       }                                                                        \
-      if (err == 0) { result = mcalite_context.results[0]; }                   \
-      else {                                                                   \
+      if (err != 0) {                                                          \
         std::cerr << "Error in mode " << mcalite_context.mode;                 \
         std::cerr << " with op " << #OP << std::endl;                          \
+        abort();                                                               \
       }                                                                        \
-      return err;                                                              \
+      return mcalite_context.results[0];                                       \
     }
   #define __RAPTOR_MCALITE_BINARY_OP(OP, FROM_TY, CPP_TY)                      \
     __RAPTOR_MPFR_ATTRIBUTES                                                   \
-    __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(OP, FROM_TY,                            \
-                                       CPP_TY & result, CPP_TY x, CPP_TY y)    \
+    __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(CPP_TY, OP, FROM_TY, CPP_TY x, CPP_TY y)\
     __RAPTOR_MCALITE_OP_FUNC_BODY(OP, x, y)
   #define __RAPTOR_MCALITE_UNARY_OP(OP, FROM_TY, CPP_TY)                       \
     __RAPTOR_MPFR_ATTRIBUTES                                                   \
-    __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(OP, FROM_TY, CPP_TY & result, CPP_TY x) \
+    __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(CPP_TY, OP, FROM_TY, CPP_TY x)          \
     __RAPTOR_MCALITE_OP_FUNC_BODY(OP, x)
   
   #define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                   \

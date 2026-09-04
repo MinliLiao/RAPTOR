@@ -100,41 +100,51 @@
                                            ...) /* LLVM_TYPE if it exists */   \
       __raptor_fprt_original_ ## FROM_TYPE ## _ ## OP_TYPE ## _ ## LLVM_OP_NAME\
         ## __VA_OPT__(_) ## __VA_ARGS__
-    #define __RAPTOR_MCA_ORIGINAL_FUNC(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,       \
-                                       LLVM_TYPE, ...)                         \
-      __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,         \
-                                     LLVM_TYPE)(__VA_ARGS__)
     #define __RAPTOR_MCA_ORIGINAL_FUNC_DECL(RET_TYPE, FROM_TYPE, OP_TYPE,      \
                                             LLVM_OP_NAME, LLVM_TYPE, ...)      \
       __RAPTOR_MPFR_ORIGINAL_ATTRIBUTES                                        \
-      RET_TYPE __RAPTOR_MCA_ORIGINAL_FUNC(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,    \
-                                            LLVM_TYPE, __VA_ARGS__);
-    #define __RAPTOR_MCA_BYPASS_MPFR_FUNC_DECL(FUNC_NAME, FROM_TYPE, ...)      \
+      RET_TYPE __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,\
+                                              LLVM_TYPE)(__VA_ARGS__);
+    #define __RAPTOR_MCA_OP_FUNC_DECL(RET_TYPE, OP_NAME, FROM_TYPE, ...)       \
       __RAPTOR_MPFR_ATTRIBUTES                                                 \
-      int __RAPTOR_MCA_CONCAT(FUNC_NAME##_, FROM_TYPE)(__VA_ARGS__);
-    #define __RAPTOR_MCA_BYPASS_MPFR_FUNC(FUNC_NAME, OP_TYPE, LLVM_OP_NAME,    \
-                                          LLVM_TYPE, FROM_TYPE, RET_TYPE, ...) \
+      RET_TYPE __RAPTOR_MCA_CONCAT(OP_NAME##_, FROM_TYPE)(__VA_ARGS__);
+    #define __RAPTOR_MCA_OP_FUNC_IF(OP_TYPE, OP_TYPE_REF, LLVM_OP_NAME,        \
+                                    LLVM_OP_NAME_REF, FUNC_NAME, FROM_TYPE,...)\
+      if constexpr((__RAPTOR_MCA_STRINGIFY(OP_TYPE) == OP_TYPE_REF &&          \
+                    __RAPTOR_MCA_STRINGIFY(LLVM_OP_NAME) == LLVM_OP_NAME_REF)  \
+      ) { return __RAPTOR_MCA_CONCAT(FUNC_NAME##_, FROM_TYPE)(__VA_ARGS__); }
+    #define __RAPTOR_MCA_BYPASS_MPFR_UNARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,   \
+                                           LLVM_TYPE, ...)                     \
       do {                                                                     \
         using namespace std::literals::string_view_literals;                   \
-        if constexpr((__RAPTOR_MCA_STRINGIFY(OP_TYPE) == "unaryop"sv &&        \
-                      __RAPTOR_MCA_STRINGIFY(LLVM_OP_NAME) == "fneg"sv) ||     \
-                     (__RAPTOR_MCA_STRINGIFY(OP_TYPE) == "binop"sv &&          \
-                      (__RAPTOR_MCA_STRINGIFY(LLVM_OP_NAME) == "fadd"sv ||     \
-                       __RAPTOR_MCA_STRINGIFY(LLVM_OP_NAME) == "fsub"sv ||     \
-                       __RAPTOR_MCA_STRINGIFY(LLVM_OP_NAME) == "fmul"sv ||     \
-                       __RAPTOR_MCA_STRINGIFY(LLVM_OP_NAME) == "fdiv"sv))      \
-        ) {                                                                    \
-          RET_TYPE res;                                                        \
-          if (__RAPTOR_MCA_CONCAT(FUNC_NAME##_, FROM_TYPE)(res, __VA_ARGS__)   \
-              == 0                                                             \
-          ) {                                                                  \
-            return res;                                                        \
-          } else { abort(); }                                                  \
-        } else {                                                               \
-          return __RAPTOR_MCA_ORIGINAL_FUNC(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,  \
-                                            LLVM_TYPE, __VA_ARGS__);           \
-        }                                                                      \
+        __RAPTOR_MCA_OP_FUNC_IF(OP_TYPE, "unaryop"sv, LLVM_OP_NAME, "fneg"sv,  \
+                                neg, FROM_TYPE, __VA_ARGS__);                  \
+        return __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,\
+                                              LLVM_TYPE)(__VA_ARGS__);         \
       } while (0)
+    #define __RAPTOR_MCA_BYPASS_MPFR_BINARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,  \
+                                            LLVM_TYPE, ...)                    \
+      do {                                                                     \
+        using namespace std::literals::string_view_literals;                   \
+        __RAPTOR_MCA_OP_FUNC_IF(OP_TYPE, "binop"sv, LLVM_OP_NAME, "fadd"sv,    \
+                                add, FROM_TYPE, __VA_ARGS__);                  \
+        __RAPTOR_MCA_OP_FUNC_IF(OP_TYPE, "binop"sv, LLVM_OP_NAME, "fsub"sv,    \
+                                sub, FROM_TYPE, __VA_ARGS__);                  \
+        __RAPTOR_MCA_OP_FUNC_IF(OP_TYPE, "binop"sv, LLVM_OP_NAME, "fmul"sv,    \
+                                mul, FROM_TYPE, __VA_ARGS__);                  \
+        __RAPTOR_MCA_OP_FUNC_IF(OP_TYPE, "binop"sv, LLVM_OP_NAME, "fdiv"sv,    \
+                                div, FROM_TYPE, __VA_ARGS__);                  \
+        return __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,\
+                                              LLVM_TYPE)(__VA_ARGS__);         \
+      } while (0)
+
+    #define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                 \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, neg, FROM_TY, CPP_TY x)                \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, add, FROM_TY, CPP_TY x, CPP_TY y)      \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, sub, FROM_TY, CPP_TY x, CPP_TY y)      \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, mul, FROM_TY, CPP_TY x, CPP_TY y)      \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, div, FROM_TY, CPP_TY x, CPP_TY y)
+    #include "raptor/FloatTypes.def"
   #endif
 #else
   #define __RAPTOR_USE_MCA false
@@ -609,16 +619,15 @@ void raptor_fprt_op_clear();
                              MPFR_SET_ARG1, ROUNDING_MODE)                     \
   __RAPTOR_MCA_ORIGINAL_FUNC_DECL(RET, FROM_TYPE, OP_TYPE, LLVM_OP_NAME,,      \
                                   ARG1 a)                                      \
-  __RAPTOR_MCA_BYPASS_MPFR_FUNC_DECL(get_si, FROM_TYPE, RET & result, ARG1 a)  \
   __RAPTOR_MPFR_ATTRIBUTES                                                     \
   RET __raptor_fprt_##FROM_TYPE##_##OP_TYPE##_##LLVM_OP_NAME(                  \
       ARG1 a, int64_t exponent, int64_t significand, int64_t mode,             \
       const char *loc, mpfr_t *scratch) {                                      \
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
-        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {   \
-          __RAPTOR_MCA_BYPASS_MPFR_FUNC(get_si, OP_TYPE, LLVM_OP_NAME,,        \
-                                        FROM_TYPE, RET, a);                    \
+        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
+          return __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE,            \
+                                                LLVM_OP_NAME)(a);              \
         }                                                                      \
       }                                                                        \
       mpfr_set_##MPFR_SET_ARG1(scratch[0], a, ROUNDING_MODE);                  \
@@ -634,17 +643,14 @@ void raptor_fprt_op_clear();
                              ROUNDING_MODE)                                    \
   __RAPTOR_MCA_ORIGINAL_FUNC_DECL(RET, FROM_TYPE, OP_TYPE, LLVM_OP_NAME,,      \
                                   ARG1 a)                                      \
-  __RAPTOR_MCA_BYPASS_MPFR_FUNC_DECL(MPFR_FUNC_NAME, FROM_TYPE, RET & result,  \
-                                     ARG1 a)                                   \
   __RAPTOR_MPFR_ATTRIBUTES                                                     \
   RET __raptor_fprt_##FROM_TYPE##_##OP_TYPE##_##LLVM_OP_NAME(                  \
       ARG1 a, int64_t exponent, int64_t significand, int64_t mode,             \
       const char *loc, mpfr_t *scratch) {                                      \
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
-        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {   \
-          __RAPTOR_MCA_BYPASS_MPFR_FUNC(MPFR_FUNC_NAME, OP_TYPE, LLVM_OP_NAME,,\
-                                        FROM_TYPE, RET, a);                    \
+        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
+          __RAPTOR_MCA_BYPASS_MPFR_UNARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,, a);\
         }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
@@ -686,17 +692,15 @@ void raptor_fprt_op_clear();
                               ARG2, ROUNDING_MODE)                             \
   __RAPTOR_MCA_ORIGINAL_FUNC_DECL(RET, FROM_TYPE, OP_TYPE, LLVM_OP_NAME,,      \
                                   ARG1 a, ARG2 b)                              \
-  __RAPTOR_MCA_BYPASS_MPFR_FUNC_DECL(MPFR_FUNC_NAME, FROM_TYPE, RET & result,  \
-                                     ARG1 a, ARG2 b)                           \
   __RAPTOR_MPFR_ATTRIBUTES                                                     \
   RET __raptor_fprt_##FROM_TYPE##_##OP_TYPE##_##LLVM_OP_NAME(                  \
       ARG1 a, ARG2 b, int64_t exponent, int64_t significand, int64_t mode,     \
       const char *loc, mpfr_t *scratch) {                                      \
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
-        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {   \
-          __RAPTOR_MCA_BYPASS_MPFR_FUNC(MPFR_FUNC_NAME, OP_TYPE, LLVM_OP_NAME,,\
-                                        FROM_TYPE, RET, a, b);                 \
+        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
+          return __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE,            \
+                                                LLVM_OP_NAME)(a, b);           \
         }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
@@ -736,17 +740,15 @@ void raptor_fprt_op_clear();
                           MPFR_SET_ARG2, ROUNDING_MODE)                        \
   __RAPTOR_MCA_ORIGINAL_FUNC_DECL(RET, FROM_TYPE, OP_TYPE, LLVM_OP_NAME,,      \
                                   ARG1 a, ARG2 b)                              \
-  __RAPTOR_MCA_BYPASS_MPFR_FUNC_DECL(MPFR_FUNC_NAME, FROM_TYPE, RET & result,  \
-                                     ARG1 a, ARG2 b)                           \
   __RAPTOR_MPFR_ATTRIBUTES                                                     \
   RET __raptor_fprt_##FROM_TYPE##_##OP_TYPE##_##LLVM_OP_NAME(                  \
       ARG1 a, ARG2 b, int64_t exponent, int64_t significand, int64_t mode,     \
       const char *loc, mpfr_t *scratch) {                                      \
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
-        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {   \
-          __RAPTOR_MCA_BYPASS_MPFR_FUNC(MPFR_FUNC_NAME, OP_TYPE, LLVM_OP_NAME,,\
-                                        FROM_TYPE, RET, a, b);                 \
+        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
+          __RAPTOR_MCA_BYPASS_MPFR_BINARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,, a,\
+                                          b);                                  \
         }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
@@ -793,17 +795,16 @@ void raptor_fprt_op_clear();
                               MPFR_TYPE, LLVM_TYPE, ROUNDING_MODE)             \
   __RAPTOR_MCA_ORIGINAL_FUNC_DECL(TYPE, FROM_TYPE, OP_TYPE, LLVM_OP_NAME,      \
                                   LLVM_TYPE, TYPE a, TYPE b, TYPE c)           \
-  __RAPTOR_MCA_BYPASS_MPFR_FUNC_DECL(fma, FROM_TYPE, TYPE & result, TYPE a,    \
-                                     TYPE b, TYPE c)                           \
   __RAPTOR_MPFR_ATTRIBUTES                                                     \
   TYPE __raptor_fprt_##FROM_TYPE##_##OP_TYPE##_##LLVM_OP_NAME##_##LLVM_TYPE(   \
       TYPE a, TYPE b, TYPE c, int64_t exponent, int64_t significand,           \
       int64_t mode, const char *loc, mpfr_t *scratch) {                        \
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
-        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {   \
-          __RAPTOR_MCA_BYPASS_MPFR_FUNC(fma, OP_TYPE, LLVM_OP_NAME, LLVM_TYPE, \
-                                        FROM_TYPE, TYPE, a, b, c);             \
+        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
+          return __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE,            \
+                                                LLVM_OP_NAME, LLVM_TYPE)(a, b, \
+                                                                         c);   \
         }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
@@ -859,17 +860,14 @@ void raptor_fprt_op_clear();
 #define __RAPTOR_MPFR_FCMP_IMPL(NAME, ORDERED, CMP, FROM_TYPE, TYPE, MPFR_GET, \
                                 ROUNDING_MODE)                                 \
   __RAPTOR_MCA_ORIGINAL_FUNC_DECL(bool, FROM_TYPE, fcmp, NAME,, TYPE a, TYPE b)\
-  __RAPTOR_MCA_BYPASS_MPFR_FUNC_DECL(cmp, FROM_TYPE, bool & result, TYPE a,    \
-                                     TYPE b)                                   \
   __RAPTOR_MPFR_ATTRIBUTES                                                     \
   bool __raptor_fprt_##FROM_TYPE##_fcmp_##NAME(                                \
       TYPE a, TYPE b, int64_t exponent, int64_t significand, int64_t mode,     \
       const char *loc, mpfr_t *scratch) {                                      \
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
-        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {   \
-          __RAPTOR_MCA_BYPASS_MPFR_FUNC(cmp, fcmp, NAME,, FROM_TYPE, bool, a,  \
-                                        b);                                    \
+        if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
+          return __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, fcmp, NAME)(a, b);  \
         }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \

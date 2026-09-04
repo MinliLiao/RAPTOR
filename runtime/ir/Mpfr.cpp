@@ -96,15 +96,6 @@
   #ifdef __RAPTOR_MCALITE_MODE
     #define __RAPTOR_MCA_BYPASS_MPFR true
     #include <string_view>
-    #define __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,   \
-                                           ...) /* LLVM_TYPE if it exists */   \
-      __raptor_fprt_original_ ## FROM_TYPE ## _ ## OP_TYPE ## _ ## LLVM_OP_NAME\
-        ## __VA_OPT__(_) ## __VA_ARGS__
-    #define __RAPTOR_MCA_ORIGINAL_FUNC_DECL(RET_TYPE, FROM_TYPE, OP_TYPE,      \
-                                            LLVM_OP_NAME, LLVM_TYPE, ...)      \
-      __RAPTOR_MPFR_ORIGINAL_ATTRIBUTES                                        \
-      RET_TYPE __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,\
-                                              LLVM_TYPE)(__VA_ARGS__);
     #define __RAPTOR_MCA_OP_FUNC_DECL(RET_TYPE, OP_NAME, FROM_TYPE, ...)       \
       __RAPTOR_MPFR_ATTRIBUTES                                                 \
       RET_TYPE __RAPTOR_MCA_CONCAT(OP_NAME##_, FROM_TYPE)(__VA_ARGS__);
@@ -119,8 +110,6 @@
         using namespace std::literals::string_view_literals;                   \
         __RAPTOR_MCA_OP_FUNC_IF(OP_TYPE, "unaryop"sv, LLVM_OP_NAME, "fneg"sv,  \
                                 neg, FROM_TYPE, __VA_ARGS__);                  \
-        return __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,\
-                                              LLVM_TYPE)(__VA_ARGS__);         \
       } while (0)
     #define __RAPTOR_MCA_BYPASS_MPFR_BINARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,  \
                                             LLVM_TYPE, ...)                    \
@@ -134,9 +123,9 @@
                                 mul, FROM_TYPE, __VA_ARGS__);                  \
         __RAPTOR_MCA_OP_FUNC_IF(OP_TYPE, "binop"sv, LLVM_OP_NAME, "fdiv"sv,    \
                                 div, FROM_TYPE, __VA_ARGS__);                  \
-        return __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,\
-                                              LLVM_TYPE)(__VA_ARGS__);         \
       } while (0)
+    #define __RAPTOR_MCA_BYPASS_MPFR_ERR(prefix, OP_TYPE, LLVM_OP_NAME)        \
+      fprintf(stderr, "%s %s %s\n", #prefix, #OP_TYPE, #LLVM_OP_NAME); abort();
 
     #define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                 \
       __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, neg, FROM_TY, CPP_TY x)                \
@@ -617,8 +606,6 @@ void raptor_fprt_op_clear();
 // this. We need to detect these patterns
 #define __RAPTOR_MPFR_LROUND(OP_TYPE, LLVM_OP_NAME, FROM_TYPE, RET, ARG1,      \
                              MPFR_SET_ARG1, ROUNDING_MODE)                     \
-  __RAPTOR_MCA_ORIGINAL_FUNC_DECL(RET, FROM_TYPE, OP_TYPE, LLVM_OP_NAME,,      \
-                                  ARG1 a)                                      \
   __RAPTOR_MPFR_ATTRIBUTES                                                     \
   RET __raptor_fprt_##FROM_TYPE##_##OP_TYPE##_##LLVM_OP_NAME(                  \
       ARG1 a, int64_t exponent, int64_t significand, int64_t mode,             \
@@ -626,8 +613,8 @@ void raptor_fprt_op_clear();
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
         if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
-          return __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE,            \
-                                                LLVM_OP_NAME)(a);              \
+          __RAPTOR_MCA_BYPASS_MPFR_ERR("Unsupported MCAlite op", OP_TYPE,      \
+                                       LLVM_OP_NAME);                          \
         }                                                                      \
       }                                                                        \
       mpfr_set_##MPFR_SET_ARG1(scratch[0], a, ROUNDING_MODE);                  \
@@ -641,8 +628,6 @@ void raptor_fprt_op_clear();
 #define __RAPTOR_MPFR_SINGOP(OP_TYPE, LLVM_OP_NAME, MPFR_FUNC_NAME, FROM_TYPE, \
                              RET, MPFR_GET, ARG1, MPFR_SET_ARG1,               \
                              ROUNDING_MODE)                                    \
-  __RAPTOR_MCA_ORIGINAL_FUNC_DECL(RET, FROM_TYPE, OP_TYPE, LLVM_OP_NAME,,      \
-                                  ARG1 a)                                      \
   __RAPTOR_MPFR_ATTRIBUTES                                                     \
   RET __raptor_fprt_##FROM_TYPE##_##OP_TYPE##_##LLVM_OP_NAME(                  \
       ARG1 a, int64_t exponent, int64_t significand, int64_t mode,             \
@@ -651,6 +636,8 @@ void raptor_fprt_op_clear();
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
         if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
           __RAPTOR_MCA_BYPASS_MPFR_UNARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,, a);\
+          __RAPTOR_MCA_BYPASS_MPFR_ERR("Unsupported MCAlite op", OP_TYPE,      \
+                                       LLVM_OP_NAME);                          \
         }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
@@ -690,8 +677,6 @@ void raptor_fprt_op_clear();
 #define __RAPTOR_MPFR_BIN_INT(OP_TYPE, LLVM_OP_NAME, MPFR_FUNC_NAME,           \
                               FROM_TYPE, RET, MPFR_GET, ARG1, MPFR_SET_ARG1,   \
                               ARG2, ROUNDING_MODE)                             \
-  __RAPTOR_MCA_ORIGINAL_FUNC_DECL(RET, FROM_TYPE, OP_TYPE, LLVM_OP_NAME,,      \
-                                  ARG1 a, ARG2 b)                              \
   __RAPTOR_MPFR_ATTRIBUTES                                                     \
   RET __raptor_fprt_##FROM_TYPE##_##OP_TYPE##_##LLVM_OP_NAME(                  \
       ARG1 a, ARG2 b, int64_t exponent, int64_t significand, int64_t mode,     \
@@ -699,8 +684,8 @@ void raptor_fprt_op_clear();
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
         if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
-          return __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE,            \
-                                                LLVM_OP_NAME)(a, b);           \
+          __RAPTOR_MCA_BYPASS_MPFR_ERR("Unsupported MCAlite op", OP_TYPE,      \
+                                       LLVM_OP_NAME);                          \
         }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
@@ -738,8 +723,6 @@ void raptor_fprt_op_clear();
 #define __RAPTOR_MPFR_BIN(OP_TYPE, LLVM_OP_NAME, MPFR_FUNC_NAME, FROM_TYPE,    \
                           RET, MPFR_GET, ARG1, MPFR_SET_ARG1, ARG2,            \
                           MPFR_SET_ARG2, ROUNDING_MODE)                        \
-  __RAPTOR_MCA_ORIGINAL_FUNC_DECL(RET, FROM_TYPE, OP_TYPE, LLVM_OP_NAME,,      \
-                                  ARG1 a, ARG2 b)                              \
   __RAPTOR_MPFR_ATTRIBUTES                                                     \
   RET __raptor_fprt_##FROM_TYPE##_##OP_TYPE##_##LLVM_OP_NAME(                  \
       ARG1 a, ARG2 b, int64_t exponent, int64_t significand, int64_t mode,     \
@@ -749,6 +732,8 @@ void raptor_fprt_op_clear();
         if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
           __RAPTOR_MCA_BYPASS_MPFR_BINARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,, a,\
                                           b);                                  \
+          __RAPTOR_MCA_BYPASS_MPFR_ERR("Unsupported MCAlite op", OP_TYPE,      \
+                                       LLVM_OP_NAME);                          \
         }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
@@ -793,8 +778,6 @@ void raptor_fprt_op_clear();
 
 #define __RAPTOR_MPFR_FMULADD(OP_TYPE, LLVM_OP_NAME, FROM_TYPE, TYPE,          \
                               MPFR_TYPE, LLVM_TYPE, ROUNDING_MODE)             \
-  __RAPTOR_MCA_ORIGINAL_FUNC_DECL(TYPE, FROM_TYPE, OP_TYPE, LLVM_OP_NAME,      \
-                                  LLVM_TYPE, TYPE a, TYPE b, TYPE c)           \
   __RAPTOR_MPFR_ATTRIBUTES                                                     \
   TYPE __raptor_fprt_##FROM_TYPE##_##OP_TYPE##_##LLVM_OP_NAME##_##LLVM_TYPE(   \
       TYPE a, TYPE b, TYPE c, int64_t exponent, int64_t significand,           \
@@ -802,9 +785,8 @@ void raptor_fprt_op_clear();
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
         if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
-          return __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, OP_TYPE,            \
-                                                LLVM_OP_NAME, LLVM_TYPE)(a, b, \
-                                                                         c);   \
+          __RAPTOR_MCA_BYPASS_MPFR_ERR("Unsupported MCAlite op", OP_TYPE,      \
+                                       LLVM_OP_NAME);                          \
         }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \
@@ -859,7 +841,6 @@ void raptor_fprt_op_clear();
 // TODO This does not currently make distinctions between ordered/unordered.
 #define __RAPTOR_MPFR_FCMP_IMPL(NAME, ORDERED, CMP, FROM_TYPE, TYPE, MPFR_GET, \
                                 ROUNDING_MODE)                                 \
-  __RAPTOR_MCA_ORIGINAL_FUNC_DECL(bool, FROM_TYPE, fcmp, NAME,, TYPE a, TYPE b)\
   __RAPTOR_MPFR_ATTRIBUTES                                                     \
   bool __raptor_fprt_##FROM_TYPE##_fcmp_##NAME(                                \
       TYPE a, TYPE b, int64_t exponent, int64_t significand, int64_t mode,     \
@@ -867,7 +848,8 @@ void raptor_fprt_op_clear();
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
         if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
-          return __RAPTOR_MCA_ORIGINAL_FUNCNAME(FROM_TYPE, fcmp, NAME)(a, b);  \
+          __RAPTOR_MCA_BYPASS_MPFR_ERR("Unsupported MCAlite op", OP_TYPE,      \
+                                       LLVM_OP_NAME);                          \
         }                                                                      \
       }                                                                        \
       __raptor_fprt_trunc_count(exponent, significand, mode, loc, scratch);    \

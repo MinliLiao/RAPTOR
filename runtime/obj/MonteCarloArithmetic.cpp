@@ -487,6 +487,7 @@
       PB,  /* Precision Bounding (PB): round(inexact(x) op inexact(y)). */
       FULL /* Full MCA: round(inexact(inexact(x) op inexact(y))). */ 
     };
+    std::atomic<uint64_t> rng_stream;
     struct mcalite_context_t {
       uint64_t rng_seed = 42;
       int t = 24; // virtual precision
@@ -538,14 +539,14 @@
         std::cout << "rng_seed = " << rng_seed << ", t = " << t << ", ";
         std::cout << "ntrials = " << ntrials << ", mode = " << mode_str();
       }
-      mcalite_context_t(uint64_t rng_stream) {
+      mcalite_context_t() {
         parse_env();
         results.resize(ntrials);
-        mca_rng_seed(&rng, rng_seed, rng_stream);
-        print(); std::cout << ", rng_stream " << rng_stream << std::endl;
+        auto stream_id = rng_stream++;
+        mca_rng_seed(&rng, rng_seed, stream_id);
       }
     };
-    mcalite_context_t mcalite_context{1};
+    thread_local mcalite_context_t mcalite_context;
   }
   #define __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(CPP_TY, OP, FROM_TY, ...)         \
     CPP_TY __raptor_mca_##OP##_##FROM_TY(__VA_ARGS__)

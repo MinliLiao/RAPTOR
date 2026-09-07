@@ -128,11 +128,16 @@
       fprintf(stderr, "%s %s %s\n", #prefix, #OP_TYPE, #LLVM_OP_NAME); abort();
 
     #define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                 \
-      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, neg, FROM_TY, CPP_TY x)                \
-      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, add, FROM_TY, CPP_TY x, CPP_TY y)      \
-      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, sub, FROM_TY, CPP_TY x, CPP_TY y)      \
-      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, mul, FROM_TY, CPP_TY x, CPP_TY y)      \
-      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, div, FROM_TY, CPP_TY x, CPP_TY y)
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, neg, FROM_TY, CPP_TY x,                \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, add, FROM_TY, CPP_TY x, CPP_TY y,      \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, sub, FROM_TY, CPP_TY x, CPP_TY y,      \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, mul, FROM_TY, CPP_TY x, CPP_TY y,      \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, div, FROM_TY, CPP_TY x, CPP_TY y,      \
+                                const char * loc)
     #include "raptor/FloatTypes.def"
   #endif
 #else
@@ -635,7 +640,8 @@ void raptor_fprt_op_clear();
     if (__raptor_fprt_is_op_mode(mode)) {                                      \
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
         if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
-          __RAPTOR_MCA_BYPASS_MPFR_UNARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,, a);\
+          __RAPTOR_MCA_BYPASS_MPFR_UNARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,, a, \
+                                         loc);                                 \
           __RAPTOR_MCA_BYPASS_MPFR_ERR("Unsupported MCAlite op", OP_TYPE,      \
                                        LLVM_OP_NAME);                          \
         }                                                                      \
@@ -731,7 +737,7 @@ void raptor_fprt_op_clear();
       if constexpr(__RAPTOR_MCA_BYPASS_MPFR) {                                 \
         if (__raptor_fprt_mca_type_is(mode, MCAType::MCAlite)) {               \
           __RAPTOR_MCA_BYPASS_MPFR_BINARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,, a,\
-                                          b);                                  \
+                                          b, loc);                             \
           __RAPTOR_MCA_BYPASS_MPFR_ERR("Unsupported MCAlite op", OP_TYPE,      \
                                        LLVM_OP_NAME);                          \
         }                                                                      \

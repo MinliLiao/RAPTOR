@@ -479,6 +479,9 @@
 
 #ifdef __RAPTOR_MCALITE_MODE
   #define __RAPTOR_USE_MCALITE true
+  #include <cmath>
+  #include <map>
+  #include <sstream>
   #include <vector>
   #include <mca.h>
   namespace {
@@ -488,6 +491,31 @@
       FULL /* Full MCA: round(inexact(inexact(x) op inexact(y))). */ 
     };
     std::atomic<uint64_t> rng_stream;
+    struct mcalite_accumulate_stats {
+      double mu = 0;
+      double variance = 0;
+      double sigma = 0;
+      double s = 0;
+      void accumulate_stats(double in_mu, double in_sigma) {
+        mu += in_mu;
+        variance += (in_sigma * in_sigma);
+      }
+      void calculate() {
+        sigma = std::sqrt(variance);
+        if (variance == 0.0) {
+            s = INFINITY;
+        } else if (mu == 0.0) {
+            s = -INFINITY;
+        } else {
+            s = -std::log2(sigma / std::fabs(mu));
+        }
+      }
+      std::string str() {
+        std::stringstream ss;
+        ss << "mu = " << mu << ", sigma = " << sigma << ", s = " << s;
+        return ss.str();
+      }
+    };
     struct mcalite_context_t {
       uint64_t rng_seed = 42;
       int t = 24; // virtual precision
@@ -495,7 +523,22 @@
       mcalite_mode mode = mcalite_mode::PB;
       bool quiet = false;
       std::vector<double> results;
+      mca_stats stats;
+      std::map<const char *, mcalite_accumulate_stats> acc_stats;
       mca_rng rng;
+      void print_stats(mca_stats * in) {
+        std::cout << "mu = " << in->mu << ", sigma = " << in->sigma;
+        std::cout << ", s = " << in->s << std::endl;
+      }
+      int calc_stats(const char *loc) {
+        int err = mca_compute_stats(results.data(), ntrials, &stats);
+        if (!quiet) { 
+          std::cout << "MCAlite stats at " << loc << ": "; 
+          print_stats(&stats); 
+        }
+        acc_stats[loc].accumulate_stats(stats.mu, stats.sigma);
+        return err;
+      }
       void parse_env() {
         // Get the seed, t, ntrials and mode from env var.
         char *env_val = getenv("MCA_SEED");
@@ -553,6 +596,13 @@
           print(); std::cout << ", rng_stream " << stream_id << std::endl;
         }
       }
+      ~mcalite_context_t() {
+        for (auto acc_stat : acc_stats) {
+          acc_stat.second.calculate();
+          std::cout << "MCAlite accumulated stats at " << acc_stat.first;
+          std::cout << ": " << acc_stat.second.str() << std::endl;
+        }
+      }
     };
     thread_local mcalite_context_t mcalite_context;
   }
@@ -576,20 +626,25 @@
           break;                                                               \
         default: err = -1; break;                                              \
       }                                                                        \
+      if (err == 0 && mcalite_context.ntrials > 1) {                           \
+        err = mcalite_context.calc_stats(loc);                                 \
+      }                                                                        \
       if (err != 0) {                                                          \
         std::cerr << "Error in mode " << mcalite_context.mode;                 \
-        std::cerr << " with op " << #OP << std::endl;                          \
+        std::cerr << " with op " << #OP << " at " << loc << std::endl;         \
         abort();                                                               \
       }                                                                        \
       return mcalite_context.results[0];                                       \
     }
   #define __RAPTOR_MCALITE_BINARY_OP(OP, FROM_TY, CPP_TY)                      \
     __RAPTOR_MPFR_ATTRIBUTES                                                   \
-    __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(CPP_TY, OP, FROM_TY, CPP_TY x, CPP_TY y)\
+    __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(CPP_TY, OP, FROM_TY, CPP_TY x, CPP_TY y,\
+                                       const char * loc)                       \
     __RAPTOR_MCALITE_OP_FUNC_BODY(OP, x, y)
   #define __RAPTOR_MCALITE_UNARY_OP(OP, FROM_TY, CPP_TY)                       \
     __RAPTOR_MPFR_ATTRIBUTES                                                   \
-    __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(CPP_TY, OP, FROM_TY, CPP_TY x)          \
+    __RAPTOR_MCALITE_OP_FUNC_SIGNATURE(CPP_TY, OP, FROM_TY, CPP_TY x,          \
+                                       const char * loc)                       \
     __RAPTOR_MCALITE_OP_FUNC_BODY(OP, x)
   
   #define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                   \

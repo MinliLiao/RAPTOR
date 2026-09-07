@@ -493,6 +493,7 @@
       int t = 24; // virtual precision
       size_t ntrials = 5; // Number of repetition per operation
       mcalite_mode mode = mcalite_mode::PB;
+      bool quiet = false;
       std::vector<double> results;
       mca_rng rng;
       void parse_env() {
@@ -525,6 +526,10 @@
             abort();
           }
         }
+        env_val = getenv("MCA_QUIET");
+        if (env_val != nullptr) {
+          quiet = true;
+        }
       }
       std::string mode_str() {
         std::string str = "FULL";
@@ -544,6 +549,9 @@
         results.resize(ntrials);
         auto stream_id = rng_stream++;
         mca_rng_seed(&rng, rng_seed, stream_id);
+        if (!quiet) {
+          print(); std::cout << ", rng_stream " << stream_id << std::endl;
+        }
       }
     };
     thread_local mcalite_context_t mcalite_context;

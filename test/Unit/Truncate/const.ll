@@ -1,5 +1,5 @@
-; RUN: if [ %llvmver -gt 12 ]; then if [ %llvmver -lt 16 ]; then %opt < %s %loadRaptor -raptor -S | FileCheck %s; fi; fi
-; RUN: if [ %llvmver -gt 12 ]; then %opt < %s %newLoadRaptor -passes="raptor" -S | FileCheck %s; fi
+; RUN: python3 -c "import sys; sys.exit(1 if (%llvmver > 12 and %llvmver < 16) else 0)" || %opt < %s %loadRaptor -raptor -S | FileCheck %s
+; RUN: python3 -c "import sys; sys.exit(1 if (%llvmver > 12) else 0)" || %opt < %s %newLoadRaptor -passes="raptor" -S | FileCheck %s
 
 define double @f(double %x) {
   %res = fadd double %x, 1.0

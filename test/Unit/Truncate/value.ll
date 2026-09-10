@@ -1,5 +1,5 @@
-; RUN: if [ %llvmver -gt 12 ]; then if [ %llvmver -lt 16 ]; then %opt < %s %loadRaptor -raptor -S | FileCheck %s; fi; fi
-; RUN: if [ %llvmver -gt 12 ]; then %opt < %s %newLoadRaptor -passes="raptor" -S | FileCheck %s; fi
+; RUN: python3 -c "import sys; sys.exit(1 if (%llvmver > 12 and %llvmver < 16) else 0)" || %opt < %s %loadRaptor -raptor -S | FileCheck %s
+; RUN: python3 -c "import sys; sys.exit(1 if (%llvmver > 12) else 0)" || %opt < %s %newLoadRaptor -passes="raptor" -S | FileCheck %s
 
 declare double @__raptor_truncate_mem_value(double, i64, i64)
 declare double @__raptor_expand_mem_value(double, i64, i64)

@@ -1,7 +1,7 @@
 // clang-format off
 // RUN: %clang -O3          %s -o %t.a.out %loadClangRaptor %linkRaptorRT -lm -lmpfr && %t.a.out
 // RUN: %clang -O3 -fopenmp %s -o %t.a.out %loadClangRaptor %linkRaptorRT -lm -lmpfr && %t.a.out
-// RUN: if [ "%hasOpenMPGPU" == "1" ]; then %clang -O3 -fopenmp --offload-arch=native -nogpulib %s -o %t.a.out %loadClangRaptor %linkRaptorRT -lm -lmpfr && %t.a.out; fi
+// RUN: python3 -c "import sys; sys.exit(1 if '%hasOpenMPGPU' == '1' else 0)" || %clang -O3 -fopenmp --offload-arch=native -nogpulib %s -o %t.a.out %loadClangRaptor %linkRaptorRT -lm -lmpfr && %t.a.out
 // clang-format on
 
 #include "../../test_utils.h"

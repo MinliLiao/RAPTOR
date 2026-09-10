@@ -147,10 +147,11 @@
 
 #ifndef __RAPTOR_MCA_BYPASS_MPFR
   #define __RAPTOR_MCA_BYPASS_MPFR false
-  #define __RAPTOR_MCA_ORIGINAL_FUNC_DECL(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,    \
+  #define __RAPTOR_MCA_BYPASS_MPFR_UNARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,     \
+                                         LLVM_TYPE, ...)
+  #define __RAPTOR_MCA_BYPASS_MPFR_BINARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,    \
                                           LLVM_TYPE, ...)
-  #define __RAPTOR_MCA_BYPASS_MPFR_FUNC_DECL(FUNC_NAME, FROM_TYPE, ...)
-  #define __RAPTOR_MCA_BYPASS_MPFR_FUNC(FUNC_NAME, ...)
+  #define __RAPTOR_MCA_BYPASS_MPFR_ERR(prefix, OP_TYPE, LLVM_OP_NAME)
 #endif
 
 __RAPTOR_MPFR_ATTRIBUTES

@@ -492,27 +492,18 @@
     };
     std::atomic<uint64_t> rng_stream;
     struct mcalite_accumulate_stats {
+      double count = 0;
       double mu = 0;
       double variance = 0;
-      double sigma = 0;
-      double s = 0;
       void accumulate_stats(double in_mu, double in_sigma) {
         mu += in_mu;
         variance += (in_sigma * in_sigma);
-      }
-      void calculate() {
-        sigma = std::sqrt(variance);
-        if (variance == 0.0) {
-            s = INFINITY;
-        } else if (mu == 0.0) {
-            s = -INFINITY;
-        } else {
-            s = -std::log2(sigma / std::fabs(mu));
-        }
+        count += 1;
       }
       std::string str() {
         std::stringstream ss;
-        ss << "mu = " << mu << ", sigma = " << sigma << ", s = " << s;
+        ss << "sum(mu) = " << mu << ", sum(variance) = " << variance;
+        ss << ", call count = " << count;
         return ss.str();
       }
     };
@@ -598,7 +589,6 @@
       }
       ~mcalite_context_t() {
         for (auto acc_stat : acc_stats) {
-          acc_stat.second.calculate();
           std::cout << "MCAlite accumulated stats at " << acc_stat.first;
           std::cout << ": " << acc_stat.second.str() << std::endl;
         }

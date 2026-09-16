@@ -513,6 +513,7 @@
       size_t ntrials = 5; // Number of repetition per operation
       mcalite_mode mode = mcalite_mode::PB;
       bool quiet = false;
+      bool mean_as_result = false;
       std::vector<double> results;
       mca_stats stats;
       std::map<const char *, mcalite_accumulate_stats> acc_stats;
@@ -563,6 +564,10 @@
         env_val = getenv("MCA_QUIET");
         if (env_val != nullptr) {
           quiet = true;
+        }
+        env_val = getenv("MCA_USE_MEAN");
+        if (env_val != nullptr) {
+          mean_as_result = true;
         }
       }
       std::string mode_str() {
@@ -623,6 +628,9 @@
         std::cerr << "Error in mode " << mcalite_context.mode;                 \
         std::cerr << " with op " << #OP << " at " << loc << std::endl;         \
         abort();                                                               \
+      }                                                                        \
+      if (mcalite_context.mean_as_result) {                                    \
+        return mcalite_context.stats.mu;                                       \
       }                                                                        \
       return mcalite_context.results[0];                                       \
     }

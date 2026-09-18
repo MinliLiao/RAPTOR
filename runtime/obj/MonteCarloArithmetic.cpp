@@ -629,7 +629,7 @@
         std::cerr << " with op " << #OP << " at " << loc << std::endl;         \
         abort();                                                               \
       }                                                                        \
-      if (mcalite_context.mean_as_result) {                                    \
+      if (mcalite_context.mean_as_result && mcalite_context.ntrials > 1) {                                    \
         return mcalite_context.stats.mu;                                       \
       }                                                                        \
       return mcalite_context.results[0];                                       \

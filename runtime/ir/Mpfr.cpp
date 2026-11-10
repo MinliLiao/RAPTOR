@@ -104,12 +104,61 @@
       if constexpr((__RAPTOR_MCA_STRINGIFY(OP_TYPE) == OP_TYPE_REF &&          \
                     __RAPTOR_MCA_STRINGIFY(LLVM_OP_NAME) == LLVM_OP_NAME_REF)  \
       ) { return __RAPTOR_MCA_CONCAT(FUNC_NAME##_, FROM_TYPE)(__VA_ARGS__); }
+    #define __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME,             \
+                                            LLVM_OP_NAME_REF, FUNC_NAME,       \
+                                            FROM_TYPE, ...)                    \
+      if constexpr(((__RAPTOR_MCA_STRINGIFY(OP_TYPE) == "intr"sv ||            \
+                     __RAPTOR_MCA_STRINGIFY(OP_TYPE) == "func"sv ) &&          \
+                    __RAPTOR_MCA_STRINGIFY(LLVM_OP_NAME) == LLVM_OP_NAME_REF)  \
+      ) { return __RAPTOR_MCA_CONCAT(FUNC_NAME##_, FROM_TYPE)(__VA_ARGS__); }
     #define __RAPTOR_MCA_BYPASS_MPFR_UNARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,   \
                                            LLVM_TYPE, ...)                     \
       do {                                                                     \
         using namespace std::literals::string_view_literals;                   \
         __RAPTOR_MCA_OP_FUNC_IF(OP_TYPE, "unaryop"sv, LLVM_OP_NAME, "fneg"sv,  \
                                 neg, FROM_TYPE, __VA_ARGS__);                  \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "exp"sv,        \
+                                        exp, FROM_TYPE, __VA_ARGS__);          \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "exp2"sv,       \
+                                        exp2, FROM_TYPE, __VA_ARGS__);         \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "expm1"sv,      \
+                                        expm1, FROM_TYPE, __VA_ARGS__);        \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "log"sv,        \
+                                        log, FROM_TYPE, __VA_ARGS__);          \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "log2"sv,       \
+                                        log2, FROM_TYPE, __VA_ARGS__);         \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "log10"sv,      \
+                                        log10, FROM_TYPE, __VA_ARGS__);        \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "log1p"sv,      \
+                                        log1p, FROM_TYPE, __VA_ARGS__);        \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "sqrt"sv,       \
+                                        sqrt, FROM_TYPE, __VA_ARGS__);         \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "cbrt"sv,       \
+                                        cbrt, FROM_TYPE, __VA_ARGS__);         \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "sin"sv,        \
+                                        sin, FROM_TYPE, __VA_ARGS__);          \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "cos"sv,        \
+                                        cos, FROM_TYPE, __VA_ARGS__);          \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "tan"sv,        \
+                                        tan, FROM_TYPE, __VA_ARGS__);          \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "asin"sv,       \
+                                        asin, FROM_TYPE, __VA_ARGS__);         \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "acos"sv,       \
+                                        acos, FROM_TYPE, __VA_ARGS__);         \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "atan"sv,       \
+                                        atan, FROM_TYPE, __VA_ARGS__);         \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "sinh"sv,       \
+                                        sinh, FROM_TYPE, __VA_ARGS__);         \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "cosh"sv,       \
+                                        cosh, FROM_TYPE, __VA_ARGS__);         \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "tanh"sv,       \
+                                        tanh, FROM_TYPE, __VA_ARGS__);         \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "asinh"sv,      \
+                                        asinh, FROM_TYPE, __VA_ARGS__);        \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "acosh"sv,      \
+                                        acosh, FROM_TYPE, __VA_ARGS__);        \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "atanh"sv,      \
+                                        atanh, FROM_TYPE, __VA_ARGS__);        \
       } while (0)
     #define __RAPTOR_MCA_BYPASS_MPFR_BINARY(FROM_TYPE, OP_TYPE, LLVM_OP_NAME,  \
                                             LLVM_TYPE, ...)                    \
@@ -123,12 +172,60 @@
                                 mul, FROM_TYPE, __VA_ARGS__);                  \
         __RAPTOR_MCA_OP_FUNC_IF(OP_TYPE, "binop"sv, LLVM_OP_NAME, "fdiv"sv,    \
                                 div, FROM_TYPE, __VA_ARGS__);                  \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "pow"sv,        \
+                                        pow, FROM_TYPE, __VA_ARGS__);          \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "atan2"sv,      \
+                                        atan2, FROM_TYPE, __VA_ARGS__);        \
+        __RAPTOR_MCA_OP_FUNC_IF_MATHLIB(OP_TYPE, LLVM_OP_NAME, "hypot"sv,      \
+                                        hypot, FROM_TYPE, __VA_ARGS__);        \
       } while (0)
     #define __RAPTOR_MCA_BYPASS_MPFR_ERR(prefix, OP_TYPE, LLVM_OP_NAME)        \
       fprintf(stderr, "%s %s %s\n", #prefix, #OP_TYPE, #LLVM_OP_NAME); abort();
 
     #define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                 \
       __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, neg, FROM_TY, CPP_TY x,                \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, exp, FROM_TY, CPP_TY x,                \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, exp2, FROM_TY, CPP_TY x,               \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, expm1, FROM_TY, CPP_TY x,              \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, log, FROM_TY, CPP_TY x,                \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, log2, FROM_TY, CPP_TY x,               \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, log10, FROM_TY, CPP_TY x,              \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, log1p, FROM_TY, CPP_TY x,              \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, sqrt, FROM_TY, CPP_TY x,               \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, cbrt, FROM_TY, CPP_TY x,               \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, sin, FROM_TY, CPP_TY x,                \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, cos, FROM_TY, CPP_TY x,                \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, tan, FROM_TY, CPP_TY x,                \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, asin, FROM_TY, CPP_TY x,               \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, acos, FROM_TY, CPP_TY x,               \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, atan, FROM_TY, CPP_TY x,               \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, sinh, FROM_TY, CPP_TY x,               \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, cosh, FROM_TY, CPP_TY x,               \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, tanh, FROM_TY, CPP_TY x,               \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, asinh, FROM_TY, CPP_TY x,              \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, acosh, FROM_TY, CPP_TY x,              \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, atanh, FROM_TY, CPP_TY x,              \
                                 const char * loc)                              \
       __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, add, FROM_TY, CPP_TY x, CPP_TY y,      \
                                 const char * loc)                              \
@@ -137,6 +234,12 @@
       __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, mul, FROM_TY, CPP_TY x, CPP_TY y,      \
                                 const char * loc)                              \
       __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, div, FROM_TY, CPP_TY x, CPP_TY y,      \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, pow, FROM_TY, CPP_TY x, CPP_TY y,      \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, atan2, FROM_TY, CPP_TY x, CPP_TY y,    \
+                                const char * loc)                              \
+      __RAPTOR_MCA_OP_FUNC_DECL(CPP_TY, hypot, FROM_TY, CPP_TY x, CPP_TY y,    \
                                 const char * loc)
     #include "raptor/FloatTypes.def"
   #endif

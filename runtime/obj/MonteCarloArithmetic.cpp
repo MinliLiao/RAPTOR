@@ -654,11 +654,35 @@
     __RAPTOR_MCALITE_OP_FUNC_BODY(OP, x)
   
   #define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                   \
+    __RAPTOR_MCALITE_UNARY_OP(neg, FROM_TY, CPP_TY)                            \
+    __RAPTOR_MCALITE_UNARY_OP(exp, FROM_TY, CPP_TY)                            \
+    __RAPTOR_MCALITE_UNARY_OP(exp2, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_UNARY_OP(expm1, FROM_TY, CPP_TY)                          \
+    __RAPTOR_MCALITE_UNARY_OP(log, FROM_TY, CPP_TY)                            \
+    __RAPTOR_MCALITE_UNARY_OP(log2, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_UNARY_OP(log10, FROM_TY, CPP_TY)                          \
+    __RAPTOR_MCALITE_UNARY_OP(log1p, FROM_TY, CPP_TY)                          \
+    __RAPTOR_MCALITE_UNARY_OP(sqrt, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_UNARY_OP(cbrt, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_UNARY_OP(sin, FROM_TY, CPP_TY)                            \
+    __RAPTOR_MCALITE_UNARY_OP(cos, FROM_TY, CPP_TY)                            \
+    __RAPTOR_MCALITE_UNARY_OP(tan, FROM_TY, CPP_TY)                            \
+    __RAPTOR_MCALITE_UNARY_OP(asin, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_UNARY_OP(acos, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_UNARY_OP(atan, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_UNARY_OP(sinh, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_UNARY_OP(cosh, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_UNARY_OP(tanh, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_UNARY_OP(asinh, FROM_TY, CPP_TY)                          \
+    __RAPTOR_MCALITE_UNARY_OP(acosh, FROM_TY, CPP_TY)                          \
+    __RAPTOR_MCALITE_UNARY_OP(atanh, FROM_TY, CPP_TY)                          \
     __RAPTOR_MCALITE_BINARY_OP(add, FROM_TY, CPP_TY)                           \
     __RAPTOR_MCALITE_BINARY_OP(sub, FROM_TY, CPP_TY)                           \
     __RAPTOR_MCALITE_BINARY_OP(mul, FROM_TY, CPP_TY)                           \
     __RAPTOR_MCALITE_BINARY_OP(div, FROM_TY, CPP_TY)                           \
-    __RAPTOR_MCALITE_UNARY_OP(neg, FROM_TY, CPP_TY)
+    __RAPTOR_MCALITE_BINARY_OP(pow, FROM_TY, CPP_TY)                           \
+    __RAPTOR_MCALITE_BINARY_OP(atan2, FROM_TY, CPP_TY)                         \
+    __RAPTOR_MCALITE_BINARY_OP(hypot, FROM_TY, CPP_TY)                         \
   #include "raptor/FloatTypes.def"
 
   #define __RAPTOR_MCALITE_get_virtual_prec                                    \

@@ -768,9 +768,17 @@ public:
       return false;
     // MCAlite do not support intrinsics
     if (Mode == TruncOpMCAMCAliteMode) { 
-      EmitWarning("UnsupportedMCA", CI, "Intrinsic not supported by MCAlite",
-                  CI);
-      return true; 
+      StringRef funcName = getFuncNameFromCall(const_cast<CallBase *>(&CI));
+      std::set<std::string> MCAlite_supported_intrinsic{ 
+        "exp", "exp2", "expm1", "log", "log2", "log10", "log1p", "sqrt", 
+        "cbrt", "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", 
+        "tanh", "asinh", "acosh", "atanh", "pow", "atan2", "hypot"
+      };
+      if (!isLibMFuncInSet(funcName.str(), MCAlite_supported_intrinsic)) {
+        EmitWarning("UnsupportedMCA", CI, "Intrinsic not supported by MCAlite",
+                    CI);
+        return true; 
+      }
     }
 
     Instruction *intr = nullptr;

@@ -29,6 +29,11 @@ endif()
 if (DEFINED __RAPTOR_MCALITE_SOURCE_DIR)
     add_compile_definitions(__RAPTOR_HAS_MCALITE)
 endif()
+if (DEFINED __RAPTOR_MCALITE_SUPPORTED_INTRINSIC_LIST)
+    add_compile_definitions(__RAPTOR_MCALITE_SUPPORTED_INTRINSIC_LIST=${__RAPTOR_MCALITE_SUPPORTED_INTRINSIC_LIST})
+else()
+    add_compile_definitions(__RAPTOR_MCALITE_SUPPORTED_INTRINSIC_LIST="exp","exp2","expm1","log","log2","log10","log1p","sqrt","cbrt","sin","cos","tan","asin","acos","atan","sinh","cosh","tanh","asinh","acosh","atanh","pow","atan2","hypot")
+endif()
 
 # on windows `PLUGIN_TOOL` doesn't link against LLVM.dll
 if ((WIN32 OR CYGWIN) AND LLVM_LINK_LLVM_DYLIB)

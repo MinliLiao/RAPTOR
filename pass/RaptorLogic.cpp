@@ -769,12 +769,15 @@ public:
     // MCAlite do not support intrinsics
     if (Mode == TruncOpMCAMCAliteMode) { 
       StringRef funcName = getFuncNameFromCall(const_cast<CallBase *>(&CI));
+      if (ID != Intrinsic::not_intrinsic) { // Not an external lib call
+        funcName = Intrinsic::getBaseName(ID).substr(5); // Remove leading "llvm."
+      }
       std::set<std::string> MCAlite_supported_intrinsic{
         __RAPTOR_MCALITE_SUPPORTED_INTRINSIC_LIST
       };
       if (!isLibMFuncInSet(funcName.str(), MCAlite_supported_intrinsic)) {
-        EmitWarning("UnsupportedMCA", CI, "Intrinsic not supported by MCAlite",
-                    CI);
+        EmitWarning("UnsupportedMCA", CI, "Intrinsic %s not supported by MCAlite",
+                    CI, funcName.str());
         return true; 
       }
     }

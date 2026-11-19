@@ -133,66 +133,66 @@ struct __raptor_mcalite_context_t {
 };
 extern thread_local __raptor_mcalite_context_t __raptor_mcalite_context;
 
-#define __RAPTOR_MCALITE_CALL_MODE_EXIST_SFINAE(prefix, OP, MODE, FROM_TY)     \
-  template <typename, typename, typename = std::void_t<>>                      \
-  struct __raptor_mcalite_##prefix##_##MODE##_##FROM_TY##_exists :             \
-    std::false_type {};                                                        \
-  template <typename T, typename ...Args>                                      \
-  struct __raptor_mcalite_##prefix##_##MODE##_##FROM_TY##_exists<T,            \
-    std::tuple<Args...>, std::void_t<decltype(mca_##OP##_##MODE(               \
-      std::declval<T>(), std::declval<Args>()..., std::declval<int>(),         \
-      std::declval<size_t>(), std::declval<mca_rng *>(),                       \
-      std::declval<double *>()))>> : std::true_type {};                        \
-  template <typename T, typename ...Args>                                      \
-  inline constexpr                                                             \
-  bool __raptor_mcalite_##prefix##_##MODE##_##FROM_TY##_exists_v =             \
-    __raptor_mcalite_##prefix##_##MODE##_##FROM_TY##_exists<T,                 \
-      std::tuple<Args...>>::value;                                             \
-  template<typename... Args>                                                   \
-  int __raptor_mcalite_##prefix##_##MODE##_##FROM_TY##_call(Args... args) {    \
-    if constexpr(                                                              \
-      __raptor_mcalite_##prefix##_##MODE##_##FROM_TY##_exists_v<Args...>       \
-    ) {                                                                        \
-      return mca_##OP##_##MODE(std::forward<Args>(args)...,                    \
-        __raptor_mcalite_context.t, __raptor_mcalite_context.ntrials,          \
-        &(__raptor_mcalite_context.rng),                                       \
-        __raptor_mcalite_context.results.data());                              \
-    } else {                                                                   \
-      fprintf(stderr, "ERROR: mca_%s_%s doesn't exist\n", #OP, #MODE);         \
-      abort(); return -1;                                                      \
-    }                                                                          \
+#define __RAPTOR_MCALITE_CALL_MODE_EXIST_SFINAE(prefix, OP, MODE, FROM_TY)    \
+  template <typename, typename, typename = std::void_t<>>                     \
+  struct __raptor_mcalite_##prefix##_##MODE##_##FROM_TY##_exists :            \
+    std::false_type {};                                                       \
+  template <typename T, typename ...Args>                                     \
+  struct __raptor_mcalite_##prefix##_##MODE##_##FROM_TY##_exists<T,           \
+    std::tuple<Args...>, std::void_t<decltype(mca_##OP##_##MODE(              \
+      std::declval<T>(), std::declval<Args>()..., std::declval<int>(),        \
+      std::declval<size_t>(), std::declval<mca_rng *>(),                      \
+      std::declval<double *>()))>> : std::true_type {};                       \
+  template <typename T, typename ...Args>                                     \
+  inline constexpr                                                            \
+  bool __raptor_mcalite_##prefix##_##MODE##_##FROM_TY##_exists_v =            \
+    __raptor_mcalite_##prefix##_##MODE##_##FROM_TY##_exists<T,                \
+      std::tuple<Args...>>::value;                                            \
+  template<typename... Args>                                                  \
+  int __raptor_mcalite_##prefix##_##MODE##_##FROM_TY##_call(Args... args) {   \
+    if constexpr(                                                             \
+      __raptor_mcalite_##prefix##_##MODE##_##FROM_TY##_exists_v<Args...>      \
+    ) {                                                                       \
+      return mca_##OP##_##MODE(std::forward<Args>(args)...,                   \
+        __raptor_mcalite_context.t, __raptor_mcalite_context.ntrials,         \
+        &(__raptor_mcalite_context.rng),                                      \
+        __raptor_mcalite_context.results.data());                             \
+    } else {                                                                  \
+      fprintf(stderr, "ERROR: mca_%s_%s doesn't exist\n", #OP, #MODE);        \
+      abort(); return -1;                                                     \
+    }                                                                         \
   }
-#define __RAPTOR_MCALITE_CALL_EXIST_SFINAE(prefix, OP, FROM_TY)                \
-  __RAPTOR_MCALITE_CALL_MODE_EXIST_SFINAE(prefix, OP, rr, FROM_TY)             \
-  __RAPTOR_MCALITE_CALL_MODE_EXIST_SFINAE(prefix, OP, pb, FROM_TY)             \
+#define __RAPTOR_MCALITE_CALL_EXIST_SFINAE(prefix, OP, FROM_TY)               \
+  __RAPTOR_MCALITE_CALL_MODE_EXIST_SFINAE(prefix, OP, rr, FROM_TY)            \
+  __RAPTOR_MCALITE_CALL_MODE_EXIST_SFINAE(prefix, OP, pb, FROM_TY)            \
   __RAPTOR_MCALITE_CALL_MODE_EXIST_SFINAE(prefix, OP, full, FROM_TY)
-#define __RAPTOR_MCALITE_OP_FUNC_BODY(prefix, OP, FROM_TY, ...)                \
-  {                                                                            \
-    int err = 0;                                                               \
-    switch (__raptor_mcalite_context.mode) {                                   \
-      case mcalite_mode::RR:                                                   \
-        err = __raptor_mcalite_##prefix##_rr_##FROM_TY##_call(__VA_ARGS__);    \
-        break;                                                                 \
-      case mcalite_mode::PB:                                                   \
-        err = __raptor_mcalite_##prefix##_pb_##FROM_TY##_call(__VA_ARGS__);    \
-        break;                                                                 \
-      case mcalite_mode::FULL:                                                 \
-        err = __raptor_mcalite_##prefix##_full_##FROM_TY##_call(__VA_ARGS__);  \
-        break;                                                                 \
-      default: err = -1; break;                                                \
-    }                                                                          \
-    if (err == 0 && __raptor_mcalite_context.ntrials > 1) {                    \
-      err = __raptor_mcalite_context.calc_stats(loc, #OP);                     \
-    }                                                                          \
-    if (err != 0) {                                                            \
-      std::cerr << "Error in mode " << __raptor_mcalite_context.mode;          \
-      std::cerr << " with op " << #OP << " at " << loc << std::endl;           \
-      abort();                                                                 \
-    }                                                                          \
-    if (__raptor_mcalite_context.mean_as_result &&                             \
-        __raptor_mcalite_context.ntrials > 1                                   \
-    ) { return __raptor_mcalite_context.stats.mu; }                            \
-    else { return __raptor_mcalite_context.results[0]; }                       \
+#define __RAPTOR_MCALITE_OP_FUNC_BODY(prefix, OP, FROM_TY, ...)               \
+  {                                                                           \
+    int err = 0;                                                              \
+    switch (__raptor_mcalite_context.mode) {                                  \
+      case mcalite_mode::RR:                                                  \
+        err = __raptor_mcalite_##prefix##_rr_##FROM_TY##_call(__VA_ARGS__);   \
+        break;                                                                \
+      case mcalite_mode::PB:                                                  \
+        err = __raptor_mcalite_##prefix##_pb_##FROM_TY##_call(__VA_ARGS__);   \
+        break;                                                                \
+      case mcalite_mode::FULL:                                                \
+        err = __raptor_mcalite_##prefix##_full_##FROM_TY##_call(__VA_ARGS__); \
+        break;                                                                \
+      default: err = -1; break;                                               \
+    }                                                                         \
+    if (err == 0 && __raptor_mcalite_context.ntrials > 1) {                   \
+      err = __raptor_mcalite_context.calc_stats(loc, #OP);                    \
+    }                                                                         \
+    if (err != 0) {                                                           \
+      std::cerr << "Error in mode " << __raptor_mcalite_context.mode;         \
+      std::cerr << " with op " << #OP << " at " << loc << std::endl;          \
+      abort();                                                                \
+    }                                                                         \
+    if (__raptor_mcalite_context.mean_as_result &&                            \
+        __raptor_mcalite_context.ntrials > 1                                  \
+    ) { return __raptor_mcalite_context.stats.mu; }                           \
+    else { return __raptor_mcalite_context.results[0]; }                      \
   }
 
 #endif // _RAPTOR_MCALITEINTERFACE_H_

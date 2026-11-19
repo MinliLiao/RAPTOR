@@ -2,7 +2,7 @@
 #include <type_traits>
 
 // verificarlo uses _Float128 that needs extra definition
-#if defined(__RAPTOR_VERIFICARLOMCA_QUAD_MODE) ||                              \
+#if defined(__RAPTOR_VERIFICARLOMCA_QUAD_MODE) ||                             \
     defined(__RAPTOR_VERIFICARLOMCA_INT_MODE)
   // Clang has "unknown type name" error for _Float128 on x86
   #if defined(__clang__) && (defined(__i386) || defined(__x86_64))
@@ -14,7 +14,7 @@
 // mpfr.h is included in Common.h
 #include <raptor/Common.h>
 
-#if defined(__RAPTOR_VERIFICARLOMCA_QUAD_MODE) ||                              \
+#if defined(__RAPTOR_VERIFICARLOMCA_QUAD_MODE) ||                             \
     defined(__RAPTOR_VERIFICARLOMCA_INT_MODE)
   #define __RAPTOR_USE_VERIFICARLOMCA true
   // Includes needed to define interface to verificarlo
@@ -445,34 +445,34 @@
   } // end of unnamed namespace
 
   // verificarlo does not change virtual precision mid run, just get from conf
-  #define __RAPTOR_VERIFICARLOMCA_get_virtual_prec(CPP_TY)                     \
-    do {                                                                       \
-      return verificarlo_mca_context.get_virtual_prec<CPP_TY>();               \
+  #define __RAPTOR_VERIFICARLOMCA_get_virtual_prec(CPP_TY)                    \
+    do {                                                                      \
+      return verificarlo_mca_context.get_virtual_prec<CPP_TY>();              \
     } while (0)
   
-  #define __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode,   \
-    isOutbound)                                                                \
-    do {                                                                       \
-      bool addInexact = verificarlo_mca_context.is_mcaint?                     \
-        verificarlo_mca_context.should_inexact<true>(isOutbound) :             \
-        verificarlo_mca_context.should_inexact<false>(isOutbound);             \
-      if (addInexact) {                                                        \
-        if (virtual_prec !=                                                    \
-            verificarlo_mca_context.get_virtual_prec<CPP_TY>()                 \
-        ) {                                                                    \
-          verificarlo_mca_context.set_virtual_prec<CPP_TY>(virtual_prec);      \
-        }                                                                      \
-        verificarlo_mca_context_t::inexact_t<CPP_TY> high_prec_a =             \
-          verificarlo_mca_context_t::get_inexact_t_from<CPP_TY>(a, rnd_mode);  \
-        verificarlo_mca_context.mca_inexact(high_prec_a);                      \
-        verificarlo_mca_context_t::assign_inexact_t_to<CPP_TY>(a, high_prec_a, \
-                                                               rnd_mode);      \
-      }                                                                        \
+  #define __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode,  \
+    isOutbound)                                                               \
+    do {                                                                      \
+      bool addInexact = verificarlo_mca_context.is_mcaint?                    \
+        verificarlo_mca_context.should_inexact<true>(isOutbound) :            \
+        verificarlo_mca_context.should_inexact<false>(isOutbound);            \
+      if (addInexact) {                                                       \
+        if (virtual_prec !=                                                   \
+            verificarlo_mca_context.get_virtual_prec<CPP_TY>()                \
+        ) {                                                                   \
+          verificarlo_mca_context.set_virtual_prec<CPP_TY>(virtual_prec);     \
+        }                                                                     \
+        verificarlo_mca_context_t::inexact_t<CPP_TY> high_prec_a =            \
+          verificarlo_mca_context_t::get_inexact_t_from<CPP_TY>(a, rnd_mode); \
+        verificarlo_mca_context.mca_inexact(high_prec_a);                     \
+        verificarlo_mca_context_t::assign_inexact_t_to<CPP_TY>(a, high_prec_a,\
+                                                               rnd_mode);     \
+      }                                                                       \
     } while (0) 
 #else
   #define __RAPTOR_USE_VERIFICARLOMCA false
   #define __RAPTOR_VERIFICARLOMCA_get_virtual_prec(CPP_TY)
-  #define __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode,   \
+  #define __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode,  \
                                           isOutbound)
 #endif // defined(__RAPTOR_VERIFICARLOMCA_QUAD_MODE) ||
        // defined(__RAPTOR_VERIFICARLOMCA_INT_MODE)
@@ -481,12 +481,12 @@
   #include "raptor/MCAliteInterface.h"
   thread_local __raptor_mcalite_context_t __raptor_mcalite_context;
   #define __RAPTOR_USE_MCALITE true
-  #define __RAPTOR_MCALITE_get_virtual_prec                                    \
+  #define __RAPTOR_MCALITE_get_virtual_prec                                   \
     do { return __raptor_mcalite_context.t; } while(0)
-  #define __RAPTOR_MCALITE_set_virtual_prec(T)                                 \
+  #define __RAPTOR_MCALITE_set_virtual_prec(T)                                \
     do { __raptor_mcalite_context.t = T; } while(0)
-  #define __RAPTOR_MCALITE_restore_virtual_prec                                \
-    do { __raptor_mcalite_context.t = __raptor_mcalite_context.env_t;          \
+  #define __RAPTOR_MCALITE_restore_virtual_prec                               \
+    do { __raptor_mcalite_context.t = __raptor_mcalite_context.env_t;         \
     } while (0)
 #else
   #define __RAPTOR_USE_MCALITE false
@@ -508,30 +508,30 @@ void raptor_mca_unset_tmp_t() {
   }
 }
 
-#define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                     \
-  __RAPTOR_MPFR_ATTRIBUTES                                                     \
-  unsigned int __raptor_mca_get_virtural_prec_##FROM_TY(mpfr_t a,              \
-                                                        const char *loc) {     \
-    if constexpr (__RAPTOR_USE_VERIFICARLOMCA) {                               \
-      __RAPTOR_VERIFICARLOMCA_get_virtual_prec(CPP_TY);                        \
-    } else if constexpr (__RAPTOR_USE_MCALITE) {                               \
-      __RAPTOR_MCALITE_get_virtual_prec;                                       \
-    } else {                                                                   \
-      std::cerr << "__raptor_mca_get_virtural_prec_" << #FROM_TY;              \
-      std::cerr << " is not implemented." << std::endl;                        \
-      abort();                                                                 \
-    }                                                                          \
-  }                                                                            \
-  __RAPTOR_MPFR_ATTRIBUTES                                                     \
-  void __raptor_mca_inexact_##FROM_TY(mpfr_t a, unsigned int virtual_prec,     \
-                                      mpfr_rnd_t rnd_mode, bool isOutbound) {  \
-    if constexpr (__RAPTOR_USE_VERIFICARLOMCA) {                               \
-      __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode,       \
-        isOutbound);                                                           \
-    } else {                                                                   \
-      std::cerr << "__raptor_mca_inexact_" << #FROM_TY;                        \
-      std::cerr << " is not implemented." << std::endl;                        \
-      abort();                                                                 \
-    }                                                                          \
+#define RAPTOR_FLOAT_TYPE(CPP_TY, FROM_TY)                                    \
+  __RAPTOR_MPFR_ATTRIBUTES                                                    \
+  unsigned int __raptor_mca_get_virtural_prec_##FROM_TY(mpfr_t a,             \
+                                                        const char *loc) {    \
+    if constexpr (__RAPTOR_USE_VERIFICARLOMCA) {                              \
+      __RAPTOR_VERIFICARLOMCA_get_virtual_prec(CPP_TY);                       \
+    } else if constexpr (__RAPTOR_USE_MCALITE) {                              \
+      __RAPTOR_MCALITE_get_virtual_prec;                                      \
+    } else {                                                                  \
+      std::cerr << "__raptor_mca_get_virtural_prec_" << #FROM_TY;             \
+      std::cerr << " is not implemented." << std::endl;                       \
+      abort();                                                                \
+    }                                                                         \
+  }                                                                           \
+  __RAPTOR_MPFR_ATTRIBUTES                                                    \
+  void __raptor_mca_inexact_##FROM_TY(mpfr_t a, unsigned int virtual_prec,    \
+                                      mpfr_rnd_t rnd_mode, bool isOutbound) { \
+    if constexpr (__RAPTOR_USE_VERIFICARLOMCA) {                              \
+      __RAPTOR_VERIFICARLOMCA_inexact(CPP_TY, a, virtual_prec, rnd_mode,      \
+        isOutbound);                                                          \
+    } else {                                                                  \
+      std::cerr << "__raptor_mca_inexact_" << #FROM_TY;                       \
+      std::cerr << " is not implemented." << std::endl;                       \
+      abort();                                                                \
+    }                                                                         \
   }
 #include "raptor/FloatTypes.def"

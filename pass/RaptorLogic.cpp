@@ -776,8 +776,8 @@ public:
         __RAPTOR_MCALITE_SUPPORTED_INTRINSIC_LIST
       };
       if (!isLibMFuncInSet(funcName.str(), MCAlite_supported_intrinsic)) {
-        EmitWarning("UnsupportedMCA", CI, "Intrinsic %s not supported by MCAlite",
-                    CI, funcName.str());
+        EmitWarning("UnsupportedMCA", CI, "Intrinsic ", funcName.str(), 
+                    " not supported by MCAlite", CI);
         return true; 
       }
     }
